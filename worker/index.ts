@@ -212,27 +212,23 @@ const worker = {
 
 		return new Response('Not Found', { status: 404 });
 	},
+
+	async queue(batch: MessageBatch, env: Env): Promise<void> {
+		for (const msg of batch.messages) {
+			const payload = msg.body as AgentTaskPayload;
+			try {
+				const doId = env.UniversalAgentSession.idFromName(payload.sessionId);
+				const stub = env.UniversalAgentSession.get(doId) as DurableObjectStub<UniversalAgentSession>;
+				await stub.processTask(payload);
+				msg.ack();
+			} catch (error) {
+				logger.error('Queue: failed to dispatch task to DO', { error, taskId: payload.taskId });
+				msg.retry();
+			}
+		}
+	},
 } satisfies ExportedHandler<Env>;
 
 export default worker;
 
-// Wrap the entire worker with Sentry for comprehensive error monitoring.
 // export default Sentry.withSentry(sentryOptions, worker);
-
-export const queue = async (
-	batch: MessageBatch<AgentTaskPayload>,
-	env: Env,
-): Promise<void> => {
-	for (const msg of batch.messages) {
-		const payload = msg.body;
-		try {
-			const doId = env.UniversalAgentSession.idFromName(payload.sessionId);
-			const stub = env.UniversalAgentSession.get(doId) as DurableObjectStub<UniversalAgentSession>;
-			await stub.processTask(payload);
-			msg.ack();
-		} catch (error) {
-			logger.error('Queue: failed to dispatch task to DO', { error, taskId: payload.taskId });
-			msg.retry();
-		}
-	}
-};
