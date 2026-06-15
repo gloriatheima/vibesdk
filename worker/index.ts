@@ -166,7 +166,9 @@ const worker = {
 
 		// Normalize hostnames for both local development (localhost) and production.
 		const isMainDomainRequest =
-			hostname === env.CUSTOM_DOMAIN || hostname === 'localhost';
+			hostname === env.CUSTOM_DOMAIN ||
+			hostname === 'localhost' ||
+			hostname.endsWith('.workers.dev');
 		const isSubdomainRequest =
 			hostname.endsWith(`.${previewDomain}`) ||
 			(hostname.endsWith('.localhost') && hostname !== 'localhost');
