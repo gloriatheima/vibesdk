@@ -1,5 +1,5 @@
 import { createLogger } from '../../logger';
-import type { ActionEventData, PlanEventData } from '../universal/types';
+import type { ActionEventData, PlanEventData, ConversationTurn } from '../universal/types';
 
 const logger = createLogger('WorkersAI');
 
@@ -240,7 +240,7 @@ export async function runExecutorBrain(
 	instruction: string,
 	plan: PlanEventData,
 	callbacks: ExecutorCallbacks,
-): Promise<void> {
+): Promise<ActionEventData[]> {
 	logger.info('Executor brain starting', { model: EXECUTOR_MODEL, steps: plan.steps.length });
 
 	const messages: ChatMessage[] = [
@@ -252,6 +252,7 @@ export async function runExecutorBrain(
 	];
 
 	const stream = await runWorkersAiStream(env.AI, EXECUTOR_MODEL, messages, 4096);
+	const collectedActions: ActionEventData[] = [];
 	let lineBuffer = '';
 
 	for await (const token of parseWorkersAiSse(stream)) {
@@ -267,15 +268,118 @@ export async function runExecutorBrain(
 			try {
 				const action = JSON.parse(trimmed) as Partial<ActionEventData>;
 				if (typeof action.step === 'number' && typeof action.tool === 'string') {
-					await callbacks.onAction({
+					const evt: ActionEventData = {
 						step: action.step,
 						tool: action.tool,
 						params: action.params ?? {},
-					});
+					};
+					collectedActions.push(evt);
+					await callbacks.onAction(evt);
 				}
 			} catch {
 				// Incomplete JSON line; wait for more tokens
 			}
 		}
 	}
+
+	return collectedActions;
+}
+
+const REFLECTOR_SYSTEM_PROMPT = `You are a task completion evaluator for an autonomous AI agent.
+You receive the original instruction, a completed execution plan, and the tool results from running each step.
+Evaluate whether the overall task is complete or if further steps are needed.
+
+Output ONLY valid JSON:
+{
+  "isDone": true | false,
+  "summary": "One-sentence summary of what was accomplished or what still needs to be done",
+  "nextInstruction": "Only include this key if isDone is false — a rephrased instruction for the next iteration"
+}
+
+No markdown. No explanation. Only the JSON object.`;
+
+export type ReflectorCallbacks = {
+	onThinking: (chunk: string) => Promise<void>;
+};
+
+export interface ReflectorResult {
+	isDone: boolean;
+	summary: string;
+	nextInstruction?: string;
+}
+
+export async function runReflectorBrain(
+	env: Env,
+	instruction: string,
+	history: ConversationTurn[],
+	callbacks: ReflectorCallbacks,
+): Promise<ReflectorResult> {
+	logger.info('Reflector brain starting', { model: PLANNER_MODEL, turns: history.length });
+
+	const historyText = history
+		.map((turn, i) => {
+			const resultsText = turn.results
+				.map((r) =>
+					r.success
+						? `Step ${r.step} (${r.tool}): OK — ${r.output.slice(0, 300)}`
+						: `Step ${r.step} (${r.tool}): FAILED — ${r.error}`,
+				)
+				.join('\n');
+			return `--- Iteration ${i + 1} ---\nPlan summary: ${turn.plan.summary}\nResults:\n${resultsText}`;
+		})
+		.join('\n\n');
+
+	const messages: ChatMessage[] = [
+		{ role: 'system', content: REFLECTOR_SYSTEM_PROMPT },
+		{
+			role: 'user',
+			content: `Original instruction: ${instruction}\n\n${historyText}`,
+		},
+	];
+
+	const stream = await runWorkersAiStream(env.AI, PLANNER_MODEL, messages, 2048);
+	const parser = new ThinkingStreamParser();
+	let fullResponse = '';
+
+	for await (const token of parseWorkersAiSse(stream)) {
+		parser.process(
+			token,
+			(chunk) => {
+				callbacks.onThinking(chunk).catch((err) => logger.error('reflector onThinking error', { err }));
+			},
+			(chunk) => {
+				fullResponse += chunk;
+			},
+		);
+	}
+
+	parser.flush(
+		(chunk) => {
+			callbacks.onThinking(chunk).catch((err) => logger.error('reflector flush error', { err }));
+		},
+		(chunk) => {
+			fullResponse += chunk;
+		},
+	);
+
+	return parseReflectorResult(fullResponse);
+}
+
+function parseReflectorResult(raw: string): ReflectorResult {
+	const match = raw.match(/\{[\s\S]*\}/);
+	if (match) {
+		try {
+			const parsed = JSON.parse(match[0]) as Partial<ReflectorResult>;
+			if (typeof parsed.isDone === 'boolean' && typeof parsed.summary === 'string') {
+				return {
+					isDone: parsed.isDone,
+					summary: parsed.summary,
+					nextInstruction: parsed.nextInstruction,
+				};
+			}
+		} catch {
+			logger.warn('Failed to parse reflector JSON, defaulting to done');
+		}
+	}
+	return { isDone: true, summary: 'Task execution complete (reflector parse fallback)' };
 }

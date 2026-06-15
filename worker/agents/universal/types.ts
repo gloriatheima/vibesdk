@@ -10,6 +10,8 @@ export type SseEventType =
 	| 'thinking'
 	| 'plan'
 	| 'action'
+	| 'result'
+	| 'reflect'
 	| 'text'
 	| 'status'
 	| 'done'
@@ -52,4 +54,23 @@ export interface DoneEventData {
 export interface ErrorEventData {
 	message: string;
 	code?: string;
+}
+
+export interface ToolResultEventData {
+	step: number;
+	tool: string;
+	success: boolean;
+	output: string;
+	error?: string;
+}
+
+export interface ReflectEventData {
+	isDone: boolean;
+	summary: string;
+	iteration: number;
+}
+
+export interface ConversationTurn {
+	plan: PlanEventData;
+	results: ToolResultEventData[];
 }
