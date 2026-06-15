@@ -3,7 +3,7 @@
 declare namespace Cloudflare {
 	interface GlobalProps {
 		mainModule: typeof import("./worker/index");
-		durableNamespaces: "CodeGeneratorAgent" | "UserAppSandboxService" | "DORateLimitStore";
+		durableNamespaces: "CodeGeneratorAgent" | "UserAppSandboxService" | "DORateLimitStore" | "UniversalAgentSession";
 	}
 	interface Env {
 		VibecoderStore: KVNamespace;
@@ -62,6 +62,8 @@ declare namespace Cloudflare {
 		AI: Ai;
 		CF_VERSION_METADATA: WorkerVersionMetadata;
 		ASSETS: Fetcher;
+		AGENT_TASK_QUEUE: Queue<import('./worker/agents/universal/types').AgentTaskPayload>;
+		UniversalAgentSession: DurableObjectNamespace<import('./worker/agents/universal/UniversalAgentSession').UniversalAgentSession>;
 	}
 }
 interface Env extends Cloudflare.Env {}

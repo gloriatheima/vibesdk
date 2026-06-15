@@ -10,11 +10,14 @@ import { isOriginAllowed } from './config/security';
 import { proxyToSandbox } from './services/sandbox/request-handler';
 import { handleGitProtocolRequest, isGitProtocolRequest } from './api/handlers/git-protocol';
 import { getAgentStub } from './agents';
+import type { AgentTaskPayload } from './agents/universal/types';
+import type { UniversalAgentSession } from './agents/universal/UniversalAgentSession';
 
 // Durable Object and Service exports
 export { UserAppSandboxService } from './services/sandbox/sandboxSdkClient';
 export { CodeGeneratorAgent } from './agents/core/codingAgent';
 export { UserSecretsStore } from './services/secrets/UserSecretsStore';
+export { UniversalAgentSession } from './agents/universal/UniversalAgentSession';
 
 // export const CodeGeneratorAgent = Sentry.instrumentDurableObjectWithSentry(sentryOptions, CodeGeneratorAgent);
 // export const DORateLimitStore = Sentry.instrumentDurableObjectWithSentry(sentryOptions, BaseDORateLimitStore);
@@ -215,3 +218,21 @@ export default worker;
 
 // Wrap the entire worker with Sentry for comprehensive error monitoring.
 // export default Sentry.withSentry(sentryOptions, worker);
+
+export const queue = async (
+	batch: MessageBatch<AgentTaskPayload>,
+	env: Env,
+): Promise<void> => {
+	for (const msg of batch.messages) {
+		const payload = msg.body;
+		try {
+			const doId = env.UniversalAgentSession.idFromName(payload.sessionId);
+			const stub = env.UniversalAgentSession.get(doId) as DurableObjectStub<UniversalAgentSession>;
+			await stub.processTask(payload);
+			msg.ack();
+		} catch (error) {
+			logger.error('Queue: failed to dispatch task to DO', { error, taskId: payload.taskId });
+			msg.retry();
+		}
+	}
+};

@@ -5,7 +5,12 @@
  {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "vibesdk-production",
+	"account_id": "fcaaec845fe02e091365a0103ea4b97f",
 	"main": "worker/index.ts",
+	"alias": {
+		"shared": "./shared",
+		"worker": "./worker"
+	},
 	"compatibility_date": "2025-08-10",
 	"compatibility_flags": ["nodejs_compat"],
     "version_metadata": {
@@ -75,7 +80,8 @@
 		{
 			"binding": "DB",
 			"database_name": "vibesdk-db",
-			"database_id": "c4721a2b-b96a-428a-8b2a-b3d255b307e9",
+			"database_id": "4deaeba2-1747-489e-906a-a58744f81811",
+			"preview_database_id": "4deaeba2-1747-489e-906a-a58744f81811",
 			"migrations_dir": "migrations",
 			"remote": true
 		}
@@ -97,13 +103,34 @@
             {
                 "class_name": "UserSecretsStore",
                 "name": "UserSecretsStore"
+            },
+            {
+                "class_name": "UniversalAgentSession",
+                "name": "UniversalAgentSession"
             }
+		]
+	},
+	"queues": {
+		"producers": [
+			{
+				"queue": "universal-agent-tasks",
+				"binding": "AGENT_TASK_QUEUE"
+			}
+		],
+		"consumers": [
+			{
+				"queue": "universal-agent-tasks",
+				"max_batch_size": 5,
+				"max_batch_timeout": 10,
+				"max_retries": 3
+			}
 		]
 	},
     "r2_buckets": [
       {
         "binding": "TEMPLATES_BUCKET",
         "bucket_name": "vibesdk-templates",
+        "preview_bucket_name": "vibesdk-templates",
         "remote": true
       }
     ],
@@ -111,6 +138,7 @@
         {
             "binding": "VibecoderStore",
             "id": "f066f3c2e4824981b48e8586c04db9c1",
+            "preview_id": "249f13f8e3e2431ca7881d0e2640f13c",
             "remote": true
         }
     ],
@@ -136,18 +164,16 @@
                 "UserSecretsStore"
             ],
             "tag": "v3"
+        },
+        {
+            "new_sqlite_classes": [
+                "UniversalAgentSession"
+            ],
+            "tag": "v4"
         }
 	],
 	"routes": [
-        {
-            "pattern": "build.cloudflare.dev",
-            "custom_domain": true
-        },
-        {
-            "pattern": "*build-preview.cloudflare.dev/*",
-            "custom_domain": false,
-            "zone_id": "db01fac4261b2604aacad8410443a3e2"
-        }
+        { "pattern": "vibesdk.gloriatrials.com", "custom_domain": true, "zone_id": "b39f7059428b35845f43027fd4de7871" }
     ],
 	"vars": {
         "TEMPLATES_REPOSITORY": "https://github.com/cloudflare/vibesdk-templates",
@@ -169,10 +195,10 @@
             },
             "version": "1.0.0"
         },
-        "CUSTOM_DOMAIN": "",
+        "CUSTOM_DOMAIN": "vibesdk.gloriatrials.com",
         "MAX_SANDBOX_INSTANCES": "10",
         "SANDBOX_INSTANCE_TYPE": "standard-3"
     },
-	"workers_dev": false,
-	"preview_urls": false
+	"workers_dev": true,
+	"preview_urls": true
 }
