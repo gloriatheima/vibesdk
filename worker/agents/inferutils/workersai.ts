@@ -255,6 +255,25 @@ export async function runExecutorBrain(
 	const collectedActions: ActionEventData[] = [];
 	let lineBuffer = '';
 
+	const tryParseAction = async (line: string): Promise<void> => {
+		const trimmed = line.trim();
+		if (!trimmed.startsWith('{')) return;
+		try {
+			const action = JSON.parse(trimmed) as Partial<ActionEventData>;
+			if (typeof action.step === 'number' && typeof action.tool === 'string') {
+				const evt: ActionEventData = {
+					step: action.step,
+					tool: action.tool,
+					params: action.params ?? {},
+				};
+				collectedActions.push(evt);
+				await callbacks.onAction(evt);
+			}
+		} catch {
+			// Incomplete JSON line; wait for more tokens
+		}
+	};
+
 	for await (const token of parseWorkersAiSse(stream)) {
 		await callbacks.onText(token);
 
@@ -263,23 +282,13 @@ export async function runExecutorBrain(
 		lineBuffer = lines.pop() ?? '';
 
 		for (const line of lines) {
-			const trimmed = line.trim();
-			if (!trimmed.startsWith('{')) continue;
-			try {
-				const action = JSON.parse(trimmed) as Partial<ActionEventData>;
-				if (typeof action.step === 'number' && typeof action.tool === 'string') {
-					const evt: ActionEventData = {
-						step: action.step,
-						tool: action.tool,
-						params: action.params ?? {},
-					};
-					collectedActions.push(evt);
-					await callbacks.onAction(evt);
-				}
-			} catch {
-				// Incomplete JSON line; wait for more tokens
-			}
+			await tryParseAction(line);
 		}
+	}
+
+	// Flush any trailing content that had no final newline
+	if (lineBuffer.trim()) {
+		await tryParseAction(lineBuffer);
 	}
 
 	return collectedActions;
