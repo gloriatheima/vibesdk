@@ -60,22 +60,7 @@
             "remote": true
         }
     ],
-	"containers": [
-		{
-			"class_name": "UserAppSandboxService",
-			"image": "./SandboxDockerfile",
-            // "image": "registry.cloudflare.com/vibesdk-production-userappsandboxservice:cfe197fc",
-            // Altering max_instances value will have no effect. Please use the MAX_SANDBOX_INSTANCES var instead.
-			"max_instances": 1400,
-            // ATTENTION: Altering instance_type value will have no effect. Please use the SANDBOX_INSTANCE_TYPE var instead.
-            "instance_type": {
-                "vcpu": 4,
-                "memory_mib": 8192,
-                "disk_mb": 10240
-            },
-            "rollout_step_percentage": 100
-		}
-	],
+	// "containers": [ ... ],  // Re-enable when container image is pushed to registry
 	"d1_databases": [
 		{
 			"binding": "DB",
@@ -92,10 +77,7 @@
 				"class_name": "CodeGeneratorAgent",
 				"name": "CodeGenObject"
 			},
-            {
-                "class_name": "UserAppSandboxService",
-                "name": "Sandbox"
-            },
+            // { "class_name": "UserAppSandboxService", "name": "Sandbox" },  // Requires container
             {
                 "class_name": "DORateLimitStore",
                 "name": "DORateLimitStore"
