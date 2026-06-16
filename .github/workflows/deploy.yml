@@ -8,7 +8,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
 
     steps:
       - uses: actions/checkout@v4
@@ -18,11 +18,21 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
+      - name: Cache TypeScript build info
+        uses: actions/cache@v4
+        with:
+          path: |
+            **/*.tsbuildinfo
+          key: tsbuildinfo-${{ runner.os }}-${{ hashFiles('tsconfig*.json') }}-${{ hashFiles('src/**/*.ts', 'src/**/*.tsx', 'worker/**/*.ts') }}
+          restore-keys: |
+            tsbuildinfo-${{ runner.os }}-${{ hashFiles('tsconfig*.json') }}-
+            tsbuildinfo-${{ runner.os }}-
+
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
       - name: Build
-        run: npm run build
+        run: npx tsc -b --incremental & npx vite build & wait
 
       - name: Deploy to Cloudflare Workers
         run: npx wrangler deploy
