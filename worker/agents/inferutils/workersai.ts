@@ -5,6 +5,7 @@ const logger = createLogger('WorkersAI');
 
 export const PLANNER_MODEL = '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b';
 export const EXECUTOR_MODEL = '@cf/qwen/qwen2.5-coder-32b-instruct';
+export const CLAUDE_MODEL = 'claude-sonnet-4-5';
 
 type ChatMessage = {
 	role: 'system' | 'user' | 'assistant';
@@ -15,71 +16,10 @@ type WorkersAiChunk = {
 	response?: string;
 };
 
-// State machine that splits deepseek-r1 output into <think>...</think> vs response content.
-// Handles partial tag tokens split across stream chunks.
-class ThinkingStreamParser {
-	private state: 'preamble' | 'thinking' | 'response' = 'preamble';
-	private buffer = '';
-
-	process(
-		token: string,
-		onThinking: (chunk: string) => void,
-		onResponse: (chunk: string) => void,
-	): void {
-		this.buffer += token;
-
-		if (this.state === 'preamble') {
-			const idx = this.buffer.indexOf('<think>');
-			if (idx !== -1) {
-				if (idx > 0) onResponse(this.buffer.slice(0, idx));
-				this.buffer = this.buffer.slice(idx + 7);
-				this.state = 'thinking';
-				this.drainThinking(onThinking, onResponse);
-			} else if (this.buffer.length > 7) {
-				// Keep last 6 chars in case a '<think>' tag is split at the boundary
-				const safe = this.buffer.slice(0, -6);
-				if (safe) onResponse(safe);
-				this.buffer = this.buffer.slice(-6);
-			}
-		} else if (this.state === 'thinking') {
-			this.drainThinking(onThinking, onResponse);
-		} else {
-			onResponse(this.buffer);
-			this.buffer = '';
-		}
-	}
-
-	flush(onThinking: (chunk: string) => void, onResponse: (chunk: string) => void): void {
-		if (!this.buffer) return;
-		if (this.state === 'thinking') {
-			onThinking(this.buffer);
-		} else {
-			onResponse(this.buffer);
-		}
-		this.buffer = '';
-	}
-
-	private drainThinking(
-		onThinking: (chunk: string) => void,
-		onResponse: (chunk: string) => void,
-	): void {
-		const endIdx = this.buffer.indexOf('</think>');
-		if (endIdx !== -1) {
-			if (endIdx > 0) onThinking(this.buffer.slice(0, endIdx));
-			this.buffer = this.buffer.slice(endIdx + 8);
-			this.state = 'response';
-			if (this.buffer) {
-				onResponse(this.buffer);
-				this.buffer = '';
-			}
-		} else if (this.buffer.length > 8) {
-			// Keep last 7 chars in case '</think>' is split at the boundary
-			const safe = this.buffer.slice(0, -7);
-			if (safe) onThinking(safe);
-			this.buffer = this.buffer.slice(-7);
-		}
-	}
-}
+type AnthropicChunk = {
+	type: string;
+	delta?: { type: string; text?: string };
+};
 
 // Calls Workers AI with stream:true and returns the raw ReadableStream.
 // Cast is required because the typed overloads don't narrow on stream:true.
@@ -95,6 +35,84 @@ async function runWorkersAiStream(
 	) => Promise<ReadableStream<Uint8Array>>;
 
 	return run(model, { messages, stream: true, max_tokens: maxTokens });
+}
+
+// Parses Anthropic SSE stream (content_block_delta events) into plain text tokens.
+async function* parseAnthropicSse(
+	stream: ReadableStream<Uint8Array>,
+): AsyncGenerator<string, void, undefined> {
+	const reader = stream.getReader();
+	const decoder = new TextDecoder();
+	let lineBuffer = '';
+
+	try {
+		while (true) {
+			const { done, value } = await reader.read();
+			if (done) break;
+
+			lineBuffer += decoder.decode(value, { stream: true });
+			const lines = lineBuffer.split('\n');
+			lineBuffer = lines.pop() ?? '';
+
+			for (const line of lines) {
+				if (!line.startsWith('data: ')) continue;
+				const payload = line.slice(6).trim();
+				if (payload === '[DONE]') return;
+
+				let chunk: AnthropicChunk;
+				try {
+					chunk = JSON.parse(payload) as AnthropicChunk;
+				} catch {
+					continue;
+				}
+
+				if (
+					chunk.type === 'content_block_delta' &&
+					chunk.delta?.type === 'text_delta' &&
+					chunk.delta.text
+				) {
+					yield chunk.delta.text;
+				}
+			}
+		}
+	} finally {
+		reader.releaseLock();
+	}
+}
+
+// Calls claude-sonnet-4-5 via Cloudflare AI Gateway Unified Billing.
+// Constructs the endpoint from CLOUDFLARE_ACCOUNT_ID + CLOUDFLARE_AI_GATEWAY slug.
+// No Anthropic key needed — billed from Cloudflare AI Gateway credits.
+async function runClaudeStream(
+	env: Env,
+	systemPrompt: string,
+	userMessage: string,
+	maxTokens = 8096,
+): Promise<ReadableStream<Uint8Array>> {
+	const url = `https://gateway.ai.cloudflare.com/v1/${env.CLOUDFLARE_ACCOUNT_ID}/${env.CLOUDFLARE_AI_GATEWAY}/anthropic/v1/messages`;
+
+	const resp = await fetch(url, {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			'cf-aig-authorization': `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
+			'anthropic-version': '2023-06-01',
+		},
+		body: JSON.stringify({
+			model: CLAUDE_MODEL,
+			max_tokens: maxTokens,
+			system: systemPrompt,
+			messages: [{ role: 'user', content: userMessage }],
+			stream: true,
+		}),
+	});
+
+	if (!resp.ok || !resp.body) {
+		const errText = await resp.text().catch(() => '');
+		throw new Error(`Claude API ${resp.status}: ${errText}`);
+	}
+
+	return resp.body;
 }
 
 // Parses the SSE-formatted chunks emitted by Workers AI streaming into plain text tokens.
@@ -147,7 +165,21 @@ Blueprint format:
   "summary": "One-line description of what will be accomplished"
 }
 
-Available tools: sandbox_run, browser_navigate, email_send, file_write, file_read, shell_exec, http_fetch
+Available tools and their key params:
+- http_fetch(url, method?, body?) — fetch any URL and return raw HTTP response
+- browser_navigate(url, format?) — navigate browser; format='content'(default)|'markdown'
+- browse(url) — navigate and return page as Markdown (preferred for reading web content)
+- browser_screenshot(url, width?, height?) — take a screenshot, returns base64 PNG data URL
+- email_send(to, subject, body, from?, html?) — send an outbound email via SEND_EMAIL binding
+- email_inbox(limit?, since_ms?) — list received emails for this session
+- email_read(id) — read full body of an inbox message by message_id
+- file_write(filename, content) — write content to in-memory file
+- file_read(filename) — read in-memory file
+- file_list() — list all in-memory files
+- call_worker(name, path, method?, body?, headers?) — call a Worker in the platform dispatch namespace (Workers for Platforms)
+- call_service(binding, path, method?, body?, headers?) — call a private internal service via Workers VPC binding
+
+IMPORTANT: Only use the tools listed above. Do NOT invent tool names or assume any other tools exist. If the result from a previous step already contains the answer, you do NOT need another tool step — the data can be read directly from the step result.
 
 Output nothing except the JSON blueprint after the thinking block. No markdown, no explanation.`;
 
@@ -161,39 +193,17 @@ export async function runPlannerBrain(
 	instruction: string,
 	callbacks: PlannerCallbacks,
 ): Promise<PlanEventData> {
-	logger.info('Planner brain starting', { model: PLANNER_MODEL });
+	logger.info('Planner brain starting', { model: CLAUDE_MODEL });
 
-	const messages: ChatMessage[] = [
-		{ role: 'system', content: PLANNER_SYSTEM_PROMPT },
-		{ role: 'user', content: instruction },
-	];
+	await callbacks.onThinking('Analyzing task...\n');
 
-	const stream = await runWorkersAiStream(env.AI, PLANNER_MODEL, messages, 8096);
-	const parser = new ThinkingStreamParser();
+	const stream = await runClaudeStream(env, PLANNER_SYSTEM_PROMPT, instruction, 8096);
+
 	let fullResponse = '';
-
-	for await (const token of parseWorkersAiSse(stream)) {
-		parser.process(
-			token,
-			(chunk) => {
-				callbacks.onThinking(chunk).catch((err) => logger.error('onThinking callback error', { err }));
-			},
-			(chunk) => {
-				fullResponse += chunk;
-				callbacks.onResponse(chunk);
-			},
-		);
+	for await (const token of parseAnthropicSse(stream)) {
+		fullResponse += token;
+		callbacks.onResponse(token);
 	}
-
-	parser.flush(
-		(chunk) => {
-			callbacks.onThinking(chunk).catch((err) => logger.error('onThinking flush error', { err }));
-		},
-		(chunk) => {
-			fullResponse += chunk;
-			callbacks.onResponse(chunk);
-		},
-	);
 
 	return parsePlanBlueprint(fullResponse, instruction);
 }
@@ -251,7 +261,7 @@ export async function runExecutorBrain(
 		},
 	];
 
-	const stream = await runWorkersAiStream(env.AI, EXECUTOR_MODEL, messages, 4096);
+	const stream = await runWorkersAiStream(env.AI, EXECUTOR_MODEL, messages, 512);
 	const collectedActions: ActionEventData[] = [];
 	let lineBuffer = '';
 
@@ -298,10 +308,12 @@ const REFLECTOR_SYSTEM_PROMPT = `You are a task completion evaluator for an auto
 You receive the original instruction, a completed execution plan, and the tool results from running each step.
 Evaluate whether the overall task is complete or if further steps are needed.
 
+Key rule: If a tool step returned data that directly answers the original instruction, mark isDone=true and include the answer in the summary. Do NOT ask for more steps just to format or re-read data that is already in the results — extract it yourself.
+
 Output ONLY valid JSON:
 {
   "isDone": true | false,
-  "summary": "One-sentence summary of what was accomplished or what still needs to be done",
+  "summary": "Summary of what was accomplished, including key data from results if relevant",
   "nextInstruction": "Only include this key if isDone is false — a rephrased instruction for the next iteration"
 }
 
@@ -325,6 +337,8 @@ export async function runReflectorBrain(
 ): Promise<ReflectorResult> {
 	logger.info('Reflector brain starting', { model: PLANNER_MODEL, turns: history.length });
 
+	await callbacks.onThinking('Reflecting on results...\n');
+
 	const historyText = history
 		.map((turn, i) => {
 			const resultsText = turn.results
@@ -340,38 +354,19 @@ export async function runReflectorBrain(
 
 	const messages: ChatMessage[] = [
 		{ role: 'system', content: REFLECTOR_SYSTEM_PROMPT },
-		{
-			role: 'user',
-			content: `Original instruction: ${instruction}\n\n${historyText}`,
-		},
+		{ role: 'user', content: `Original instruction: ${instruction}\n\n${historyText}` },
 	];
 
-	const stream = await runWorkersAiStream(env.AI, PLANNER_MODEL, messages, 2048);
-	const parser = new ThinkingStreamParser();
-	let fullResponse = '';
+	const stream = await runWorkersAiStream(env.AI, PLANNER_MODEL, messages, 1024);
 
+	let fullResponse = '';
 	for await (const token of parseWorkersAiSse(stream)) {
-		parser.process(
-			token,
-			(chunk) => {
-				callbacks.onThinking(chunk).catch((err) => logger.error('reflector onThinking error', { err }));
-			},
-			(chunk) => {
-				fullResponse += chunk;
-			},
-		);
+		fullResponse += token;
 	}
 
-	parser.flush(
-		(chunk) => {
-			callbacks.onThinking(chunk).catch((err) => logger.error('reflector flush error', { err }));
-		},
-		(chunk) => {
-			fullResponse += chunk;
-		},
-	);
-
-	return parseReflectorResult(fullResponse);
+	// deepseek-r1 emits <think>...</think> before the JSON — strip it.
+	const stripped = fullResponse.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+	return parseReflectorResult(stripped);
 }
 
 function parseReflectorResult(raw: string): ReflectorResult {

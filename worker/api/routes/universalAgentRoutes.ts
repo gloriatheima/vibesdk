@@ -81,6 +81,47 @@ export function setupUniversalAgentRoutes(app: Hono<AppEnv>): void {
 		},
 	);
 
+	// List files written to R2 for a session.
+	app.get(
+		'/api/universal/sessions/:sessionId/files',
+		setAuthLevel(AuthConfig.authenticated),
+		async (c) => {
+			const authResult = await enforceAuthRequirement(c);
+			if (authResult) return authResult;
+
+			const sessionId = c.req.param('sessionId');
+			const prefix = `sessions/${sessionId}/`;
+			const list = await c.env.SESSION_FILES_BUCKET.list({ prefix });
+			const files = list.objects.map(obj => ({
+				path: obj.key.slice(prefix.length),
+				size: obj.size,
+				uploaded: obj.uploaded.toISOString(),
+			}));
+			return c.json({ files });
+		},
+	);
+
+	// Return content of a specific session file from R2.
+	app.get(
+		'/api/universal/sessions/:sessionId/files/*',
+		setAuthLevel(AuthConfig.authenticated),
+		async (c) => {
+			const authResult = await enforceAuthRequirement(c);
+			if (authResult) return authResult;
+
+			const sessionId = c.req.param('sessionId');
+			const filePath = c.req.param('*');
+			if (!filePath) return c.json({ error: 'file path is required' }, 400);
+
+			const key = `sessions/${sessionId}/${filePath}`;
+			const object = await c.env.SESSION_FILES_BUCKET.get(key);
+			if (!object) return c.json({ error: 'File not found' }, 404);
+
+			const content = await object.text();
+			return c.json({ path: filePath, content });
+		},
+	);
+
 	// SSE stream: proxy from the UniversalAgentSession DO for a given session.
 	app.get(
 		'/api/universal/sessions/:sessionId/stream',

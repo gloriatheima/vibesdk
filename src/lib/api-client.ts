@@ -57,6 +57,9 @@ import type{
 	CapabilitiesData,
 	VaultConfigResponse,
 	VaultStatusResponse,
+	SubmitAgentTaskResponse,
+	SessionFilesResponse,
+	SessionFileContentResponse,
 } from '@/api-types';
 import {
 	RateLimitExceededError,
@@ -1157,6 +1160,24 @@ class ApiClient {
 	 */
 	async getProfile(noToast: boolean = false): Promise<ApiResponse<ProfileResponseData>> {
 		return this.request<ProfileResponseData>('/api/auth/profile', undefined, noToast);
+	}
+
+	/**
+	 * Submit a task to the Universal Agent
+	 */
+	async submitAgentTask(instruction: string): Promise<ApiResponse<SubmitAgentTaskResponse>> {
+		return this.request<SubmitAgentTaskResponse>('/api/universal/tasks', {
+			method: 'POST',
+			body: { instruction },
+		});
+	}
+
+	async getSessionFiles(sessionId: string): Promise<ApiResponse<SessionFilesResponse>> {
+		return this.request<SessionFilesResponse>(`/api/universal/sessions/${sessionId}/files`);
+	}
+
+	async getSessionFileContent(sessionId: string, filePath: string): Promise<ApiResponse<SessionFileContentResponse>> {
+		return this.request<SessionFileContentResponse>(`/api/universal/sessions/${sessionId}/files/${filePath}`);
 	}
 
 	/**

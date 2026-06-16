@@ -2,6 +2,7 @@ import { DurableObject } from 'cloudflare:workers';
 import { createLogger } from '../../logger';
 import { runPlannerBrain, runExecutorBrain, runReflectorBrain } from '../inferutils/workersai';
 import { ToolExecutor } from './tools/executor';
+import { MCPClient } from './mcp/client';
 import type {
 	AgentTaskPayload,
 	SseEventType,
@@ -14,6 +15,7 @@ import type {
 	ErrorEventData,
 	ToolResultEventData,
 	ReflectEventData,
+	FileEventData,
 	ConversationTurn,
 } from './types';
 
@@ -25,6 +27,7 @@ type SsePayload =
 	| { type: 'action'; data: ActionEventData }
 	| { type: 'result'; data: ToolResultEventData }
 	| { type: 'reflect'; data: ReflectEventData }
+	| { type: 'file'; data: FileEventData }
 	| { type: 'text'; data: TextEventData }
 	| { type: 'status'; data: StatusEventData }
 	| { type: 'done'; data: DoneEventData }
@@ -88,7 +91,21 @@ export class UniversalAgentSession extends DurableObject<Env> {
 
 	// Full Planner → Executor → Tool → Reflect loop (up to MAX_ITERATIONS).
 	private async runOrchestrationLoop(payload: AgentTaskPayload): Promise<void> {
-		const toolExecutor = new ToolExecutor();
+		const fileExecutor = new ToolExecutor(this.env, payload.sessionId);
+		const mcpClient = new MCPClient(payload.sessionId);
+
+		const FILE_TOOLS = ['file_write', 'file_read', 'file_list'];
+		const REMOTE_TOOLS = [
+			'browse', 'browser_navigate', 'browser_screenshot',
+			'http_fetch',
+			'email_send', 'email_inbox', 'email_read',
+			'call_worker', 'call_service',
+			'shell_exec', 'sandbox_run',
+		];
+
+		mcpClient.registerLocal(FILE_TOOLS, (action) => fileExecutor.runLocal(action));
+		mcpClient.registerServiceBinding(REMOTE_TOOLS, this.env.TOOL_SERVER);
+
 		const history: ConversationTurn[] = [];
 		let currentInstruction = payload.instruction;
 
@@ -125,9 +142,16 @@ export class UniversalAgentSession extends DurableObject<Env> {
 
 				const results: ToolResultEventData[] = [];
 				for (const action of actions) {
-					const result = await toolExecutor.run(action);
+					const result = await mcpClient.run(action);
 					results.push(result);
 					await this.emit({ type: 'result', data: result });
+					if (action.tool === 'file_write' && action.params.filename) {
+						const content = String(action.params.content ?? '');
+						await this.emit({
+							type: 'file',
+							data: { path: String(action.params.filename), size: content.length },
+						});
+					}
 				}
 
 				history.push({ plan, results });

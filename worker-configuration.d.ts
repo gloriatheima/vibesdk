@@ -41,6 +41,8 @@ declare namespace Cloudflare {
 		MAX_SANDBOX_INSTANCES: string;
 		SANDBOX_INSTANCE_TYPE: string;
 		CUSTOM_DOMAIN: string;
+		EMAIL_FROM: string;
+		EMAIL_DOMAIN: string;
 		CUSTOM_PREVIEW_DOMAIN: string;
 		ALLOCATION_STRATEGY: string;
 		GITHUB_EXPORTER_CLIENT_ID: string;
@@ -55,11 +57,15 @@ declare namespace Cloudflare {
 		DORateLimitStore: DurableObjectNamespace<import("./worker/index").DORateLimitStore>;
 		UserSecretsStore: DurableObjectNamespace<import("./worker/index").UserSecretsStore>;
 		TEMPLATES_BUCKET: R2Bucket;
+		SESSION_FILES_BUCKET: R2Bucket;
 		DB: D1Database;
 		DISPATCHER: DispatchNamespace;
 		API_RATE_LIMITER: RateLimit;
 		AUTH_RATE_LIMITER: RateLimit;
 		AI: Ai;
+		BROWSER: Fetcher;
+		TOOL_SERVER: Fetcher;
+		SEND_EMAIL: { send(message: unknown): Promise<void> };
 		CF_VERSION_METADATA: WorkerVersionMetadata;
 		ASSETS: Fetcher;
 		AGENT_TASK_QUEUE: Queue<import('./worker/agents/universal/types').AgentTaskPayload>;

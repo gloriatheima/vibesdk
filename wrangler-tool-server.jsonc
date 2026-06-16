@@ -1,0 +1,50 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "vibesdk-tool-server",
+	"account_id": "fcaaec845fe02e091365a0103ea4b97f",
+	"main": "worker-mcp/index.ts",
+	"compatibility_date": "2025-08-10",
+	"compatibility_flags": ["nodejs_compat"],
+	"workers_dev": false,
+	"observability": {
+		"enabled": true,
+		"head_sampling_rate": 1
+	},
+	"browser": {
+		"binding": "BROWSER"
+	},
+	"send_email": [
+		{
+			"name": "SEND_EMAIL"
+		}
+	],
+	"dispatch_namespaces": [
+		{
+			"binding": "DISPATCHER",
+			"namespace": "vibesdk-default-namespace",
+			"remote": true
+		}
+	],
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "vibesdk-db",
+			"database_id": "4deaeba2-1747-489e-906a-a58744f81811",
+			"preview_database_id": "4deaeba2-1747-489e-906a-a58744f81811",
+			"remote": true
+		}
+	],
+	"vars": {
+		"EMAIL_FROM": "agent@mail.gloriatrials.com",
+		"EMAIL_DOMAIN": "mail.gloriatrials.com"
+	},
+	// Secrets to set after deploy:
+	//   wrangler secret put CLOUDFLARE_ACCOUNT_ID -c wrangler-tool-server.jsonc
+	//   wrangler secret put CLOUDFLARE_API_TOKEN  -c wrangler-tool-server.jsonc
+	"vpc_services": [
+		{
+			"binding": "WORDPRESS",
+			"service_id": "019ecea8-c7c3-7aa3-8697-542ccb904fdc"
+		}
+	]
+}

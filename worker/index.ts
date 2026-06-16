@@ -12,6 +12,7 @@ import { handleGitProtocolRequest, isGitProtocolRequest } from './api/handlers/g
 import { getAgentStub } from './agents';
 import type { AgentTaskPayload } from './agents/universal/types';
 import type { UniversalAgentSession } from './agents/universal/UniversalAgentSession';
+import { handleInboundEmail, type ForwardableEmailMessage } from './agents/universal/email-handler';
 
 // Durable Object and Service exports
 export { UserAppSandboxService } from './services/sandbox/sandboxSdkClient';
@@ -213,6 +214,10 @@ const worker = {
 		}
 
 		return new Response('Not Found', { status: 404 });
+	},
+
+	async email(message: ForwardableEmailMessage, env: Env): Promise<void> {
+		await handleInboundEmail(message, env);
 	},
 
 	async queue(batch: MessageBatch, env: Env): Promise<void> {

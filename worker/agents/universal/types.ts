@@ -12,6 +12,7 @@ export type SseEventType =
 	| 'action'
 	| 'result'
 	| 'reflect'
+	| 'file'
 	| 'text'
 	| 'status'
 	| 'done'
@@ -68,6 +69,11 @@ export interface ReflectEventData {
 	isDone: boolean;
 	summary: string;
 	iteration: number;
+}
+
+export interface FileEventData {
+	path: string;
+	size: number;
 }
 
 export interface ConversationTurn {

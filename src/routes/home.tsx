@@ -15,6 +15,7 @@ import { useDragDrop } from '@/hooks/use-drag-drop';
 import { ImageUploadButton } from '@/components/image-upload-button';
 import { ImageAttachmentPreview } from '@/components/image-attachment-preview';
 import { toast } from 'sonner';
+import { apiClient } from '@/lib/api-client';
 
 export default function Home() {
 	const navigate = useNavigate();
@@ -23,6 +24,8 @@ export default function Home() {
 	const [projectMode, setProjectMode] = useState<ProjectType>('app');
 	const [query, setQuery] = useState('');
 	const { user } = useAuth();
+	const [isAgentMode, setIsAgentMode] = useState(false);
+	const [isSubmittingAgent, setIsSubmittingAgent] = useState(false);
 	const { isLoadingCapabilities, capabilities, getEnabledFeatures } = useFeature();
 
 	const modeOptions = useMemo<ProjectModeOption[]>(() => {
@@ -116,6 +119,24 @@ export default function Home() {
 		navigate(intendedUrl);
 		// Clear images after navigation
 		clearImages();
+	};
+
+	const handleAgentSubmit = async (instruction: string) => {
+		if (!instruction.trim()) return;
+		if (!requireAuth({ requireFullAuth: true, actionContext: 'to run the agent' })) return;
+		setIsSubmittingAgent(true);
+		try {
+			const result = await apiClient.submitAgentTask(instruction);
+			if (result.data) {
+				navigate(`/agent/${result.data.sessionId}`, { state: { instruction } });
+			} else {
+				toast.error('Failed to start agent task');
+			}
+		} catch {
+			toast.error('Failed to start agent task');
+		} finally {
+			setIsSubmittingAgent(false);
+		}
 	};
 
 	// Auto-resize textarea based on content
@@ -213,7 +234,11 @@ export default function Home() {
 							onSubmit={(e) => {
 								e.preventDefault();
 								const query = textareaRef.current!.value;
-								handleCreateApp(query, projectMode);
+								if (isAgentMode) {
+									handleAgentSubmit(query);
+								} else {
+									handleCreateApp(query, projectMode);
+								}
 							}}
 							className="flex z-10 flex-col w-full min-h-[150px] bg-bg-4 border border-accent/30 dark:border-accent/50 dark:bg-bg-2 rounded-[18px] shadow-textarea p-5 transition-all duration-200"
 						>
@@ -244,7 +269,11 @@ export default function Home() {
 										if (e.key === 'Enter' && !e.shiftKey) {
 											e.preventDefault();
 											const query = textareaRef.current!.value;
-											handleCreateApp(query, projectMode);
+											if (isAgentMode) {
+												handleAgentSubmit(query);
+											} else {
+												handleCreateApp(query, projectMode);
+											}
 										}
 									}}
 								/>
@@ -273,13 +302,25 @@ export default function Home() {
 								)}
 
 								<div className={clsx('flex items-center gap-2', showModeSelector && 'ml-4')}>
+									<button
+										type="button"
+										onClick={() => setIsAgentMode(m => !m)}
+										className={clsx(
+											'px-3 py-1 text-xs font-medium rounded-md border transition-colors',
+											isAgentMode
+												? 'bg-accent text-white border-accent'
+												: 'border-border-primary text-text-tertiary hover:text-text-primary hover:border-accent/50',
+										)}
+									>
+										Agent
+									</button>
 									<ImageUploadButton
 										onFilesSelected={addImages}
 										disabled={isProcessing}
 									/>
 									<button
 										type="submit"
-										disabled={!query.trim()}
+										disabled={!query.trim() || isSubmittingAgent}
 										className="bg-accent text-white p-1 rounded-md *:size-5 transition-all duration-200 hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
 									>
 										<ArrowRight />

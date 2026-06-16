@@ -6,6 +6,7 @@
 	"scripts": {
 		"setup": "tsx scripts/setup.ts",
 		"prepare": "husky",
+		"postinstall": "cd node_modules && ln -sf ../worker worker && ln -sf ../shared shared",
 		"dev": "DEV_MODE=true vite",
 		"build": "tsc -b --incremental && vite build",
 		"typecheck": "tsc -b --incremental --noEmit",

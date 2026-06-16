@@ -211,6 +211,42 @@ export type { AIModels } from 'worker/agents/inferutils/config.types';
 // Model selection types
 export type ModelSelectionMode = 'platform' | 'byok' | 'custom';
 
+// Universal Agent SSE Types
+export type {
+	SseEventType,
+	ThinkingEventData,
+	PlanEventData,
+	ActionEventData,
+	TextEventData,
+	StatusEventData,
+	DoneEventData,
+	ErrorEventData,
+	ToolResultEventData,
+	ReflectEventData,
+	FileEventData,
+	TaskStep,
+} from 'worker/agents/universal/types';
+
+export interface SubmitAgentTaskResponse {
+	taskId: string;
+	sessionId: string;
+}
+
+export interface SessionFileEntry {
+	path: string;
+	size: number;
+	uploaded?: string;
+}
+
+export interface SessionFilesResponse {
+	files: SessionFileEntry[];
+}
+
+export interface SessionFileContentResponse {
+	path: string;
+	content: string;
+}
+
 // Match chat FileType interface
 export interface FileType {
 	filePath: string;
