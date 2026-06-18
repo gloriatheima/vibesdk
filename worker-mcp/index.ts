@@ -1,10 +1,12 @@
 import { getSandbox } from '@cloudflare/sandbox';
+import type { Sandbox as SandboxDO } from '@cloudflare/sandbox';
 import type { ToolServerEnv } from './env';
 import { handleMcpRequest } from './router';
 import type { SandboxPool as SandboxPoolType } from './pool';
 
 export { Sandbox } from '@cloudflare/sandbox';
 export { SandboxPool } from './pool';
+export { PersistentSandbox } from './persistent-sandbox';
 
 export default {
 	async fetch(request: Request, env: ToolServerEnv): Promise<Response> {
@@ -30,10 +32,11 @@ export default {
 			env.SandboxPool.idFromName('global'),
 		) as unknown as SandboxPoolType;
 		const slotIds = await pool.getAllSlotIds();
+		const ps = env.PersistentSandbox as unknown as DurableObjectNamespace<SandboxDO>;
 		await Promise.allSettled(
 			slotIds.map((id) => {
-				const sandbox = getSandbox(env.Sandbox, id);
-				return sandbox.exec('echo "keepalive"', { timeout: 90 });
+				const sandbox = getSandbox(ps, id);
+				return sandbox.exec('echo "keepalive"', { timeout: 30 });
 			}),
 		);
 	},

@@ -7,6 +7,12 @@
 			"image": "./worker-mcp/Dockerfile",
 			"instance_type": "standard-4",
 			"max_instances": 10
+		},
+		{
+			"class_name": "PersistentSandbox",
+			"image": "./worker-mcp/Dockerfile",
+			"instance_type": "standard-4",
+			"max_instances": 5
 		}
 	],
 	"durable_objects": {
@@ -18,6 +24,10 @@
 			{
 				"class_name": "SandboxPool",
 				"name": "SandboxPool"
+			},
+			{
+				"class_name": "PersistentSandbox",
+				"name": "PersistentSandbox"
 			}
 		]
 	},
@@ -29,10 +39,14 @@
 		{
 			"new_classes": ["SandboxPool"],
 			"tag": "v2"
+		},
+		{
+			"new_sqlite_classes": ["PersistentSandbox"],
+			"tag": "v3"
 		}
 	],
 	"triggers": {
-		"crons": ["*/3 * * * *"]
+		"crons": ["*/5 * * * *"]
 	},
 	"account_id": "fcaaec845fe02e091365a0103ea4b97f",
 	"main": "worker-mcp/index.ts",

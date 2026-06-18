@@ -1,4 +1,5 @@
 import { getSandbox } from '@cloudflare/sandbox';
+import type { Sandbox as SandboxDO } from '@cloudflare/sandbox';
 import type { McpTool } from '../../worker/agents/universal/mcp/types';
 import type { ToolServerEnv } from '../env';
 import type { SandboxPool } from '../pool';
@@ -80,7 +81,8 @@ async function acquirePoolSlot(env: ToolServerEnv, sessionId: string): Promise<s
 		const result = await pool.acquire(sessionId);
 		if (!result) return sessionId;
 		if (result.needsCleanup) {
-			const sandbox = getSandbox(env.Sandbox, result.slotId);
+			const ps = env.PersistentSandbox as unknown as DurableObjectNamespace<SandboxDO>;
+			const sandbox = getSandbox(ps, result.slotId);
 			await sandbox
 				.exec('rm -rf /workspace && mkdir -p /workspace', { timeout: 15 })
 				.catch(() => {});
@@ -100,7 +102,11 @@ export async function executeTool(
 	if (!env.Sandbox) throw new Error('Sandbox binding not configured on tool server');
 
 	const sandboxId = await acquirePoolSlot(env, sessionId);
-	const sandbox = getSandbox(env.Sandbox, sandboxId);
+	const isPoolSlot = sandboxId.startsWith('sandbox-pool-');
+	const ns = isPoolSlot
+		? (env.PersistentSandbox as unknown as DurableObjectNamespace<SandboxDO>)
+		: env.Sandbox;
+	const sandbox = getSandbox(ns, sandboxId);
 
 	switch (name) {
 		case 'sandbox_run':
