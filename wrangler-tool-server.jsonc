@@ -69,10 +69,11 @@
 			"service_id": "019ecea8-c7c3-7aa3-8697-542ccb904fdc"
 		}
 	],
-	"artifacts": [
-		{
-			"binding": "ARTIFACTS",
-			"namespace": "default"
-		}
-	]
+	// "artifacts" binding re-enable when account access is granted (error 10015):
+	// "artifacts": [
+	// 	{
+	// 		"binding": "ARTIFACTS",
+	// 		"namespace": "default"
+	// 	}
+	// ]
 }

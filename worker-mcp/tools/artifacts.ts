@@ -74,16 +74,17 @@ export async function executeTool(
 	env: ToolServerEnv,
 ): Promise<string> {
 	if (!env.ARTIFACTS) throw new Error('ARTIFACTS binding not configured on tool server');
+	const artifacts = env.ARTIFACTS;
 
 	switch (name) {
 		case 'artifact_create':
-			return runCreate(args, env);
+			return runCreate(args, artifacts);
 		case 'artifact_get_token':
-			return runGetToken(args, env);
+			return runGetToken(args, artifacts);
 		case 'artifact_list':
-			return runList(args, env);
+			return runList(args, artifacts);
 		case 'artifact_delete':
-			return runDelete(args, env);
+			return runDelete(args, artifacts);
 		default:
 			throw new Error(`artifacts: unknown tool ${name}`);
 	}
@@ -94,7 +95,7 @@ function toAuthRemote(remote: string, token: string): string {
 	return `https://x:${secret}@${remote.slice('https://'.length)}`;
 }
 
-async function runCreate(args: Record<string, unknown>, env: ToolServerEnv): Promise<string> {
+async function runCreate(args: Record<string, unknown>, artifacts: Artifacts): Promise<string> {
 	const repoName = str(args.name);
 	if (!repoName) throw new Error('artifact_create requires name');
 
@@ -105,7 +106,7 @@ async function runCreate(args: Record<string, unknown>, env: ToolServerEnv): Pro
 	let defaultBranch: string;
 
 	try {
-		const created = await env.ARTIFACTS.create(repoName, {
+		const created = await artifacts.create(repoName, {
 			description,
 			readOnly: false,
 			setDefaultBranch: 'main',
@@ -116,7 +117,7 @@ async function runCreate(args: Record<string, unknown>, env: ToolServerEnv): Pro
 	} catch (err) {
 		const msg = err instanceof Error ? err.message : String(err);
 		if (msg.includes('already exists') || msg.includes('conflict')) {
-			const repo = await env.ARTIFACTS.get(repoName);
+			const repo = await artifacts.get(repoName);
 			remote = repo.remote;
 			defaultBranch = repo.defaultBranch;
 			const tokenResult = await repo.createToken('write', 3600);
@@ -126,7 +127,7 @@ async function runCreate(args: Record<string, unknown>, env: ToolServerEnv): Pro
 		}
 	}
 
-	const repo = await env.ARTIFACTS.get(repoName);
+	const repo = await artifacts.get(repoName);
 	const readTokenResult = await repo.createToken('read', 86400 * 7);
 
 	return JSON.stringify({
@@ -140,14 +141,14 @@ async function runCreate(args: Record<string, unknown>, env: ToolServerEnv): Pro
 	});
 }
 
-async function runGetToken(args: Record<string, unknown>, env: ToolServerEnv): Promise<string> {
+async function runGetToken(args: Record<string, unknown>, artifacts: Artifacts): Promise<string> {
 	const repoName = str(args.name);
 	if (!repoName) throw new Error('artifact_get_token requires name');
 
 	const scope = args.scope === 'write' ? 'write' : ('read' as const);
 	const ttl = typeof args.ttl === 'number' ? args.ttl : 86400;
 
-	const repo = await env.ARTIFACTS.get(repoName);
+	const repo = await artifacts.get(repoName);
 	const tokenResult = await repo.createToken(scope, ttl);
 
 	return JSON.stringify({
@@ -160,9 +161,9 @@ async function runGetToken(args: Record<string, unknown>, env: ToolServerEnv): P
 	});
 }
 
-async function runList(args: Record<string, unknown>, env: ToolServerEnv): Promise<string> {
+async function runList(args: Record<string, unknown>, artifacts: Artifacts): Promise<string> {
 	const limit = typeof args.limit === 'number' ? args.limit : 20;
-	const result = await env.ARTIFACTS.list({ limit });
+	const result = await artifacts.list({ limit });
 
 	return JSON.stringify({
 		repos: result.repos.map((r) => ({ name: r.name, status: r.status })),
@@ -170,10 +171,10 @@ async function runList(args: Record<string, unknown>, env: ToolServerEnv): Promi
 	});
 }
 
-async function runDelete(args: Record<string, unknown>, env: ToolServerEnv): Promise<string> {
+async function runDelete(args: Record<string, unknown>, artifacts: Artifacts): Promise<string> {
 	const repoName = str(args.name);
 	if (!repoName) throw new Error('artifact_delete requires name');
 
-	const deleted = await env.ARTIFACTS.delete(repoName);
+	const deleted = await artifacts.delete(repoName);
 	return JSON.stringify({ deleted, name: repoName });
 }

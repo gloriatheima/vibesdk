@@ -6,7 +6,7 @@ export interface ToolServerEnv {
 	SEND_EMAIL: { send(message: unknown): Promise<void> };
 	DISPATCHER: DispatchNamespace;
 	WORDPRESS: Fetcher;
-	ARTIFACTS: Artifacts;
+	ARTIFACTS?: Artifacts;
 	Sandbox: DurableObjectNamespace<SandboxDO>;
 	CLOUDFLARE_ACCOUNT_ID: string;
 	CLOUDFLARE_API_TOKEN: string;
