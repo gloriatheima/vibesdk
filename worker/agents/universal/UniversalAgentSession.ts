@@ -122,7 +122,7 @@ export class UniversalAgentSession extends DurableObject<Env> {
 		const fileExecutor = new ToolExecutor(this.env, payload.sessionId);
 		const mcpClient = new MCPClient(payload.sessionId);
 
-		const FILE_TOOLS = ['file_write', 'file_read', 'file_list'];
+		const FILE_TOOLS = ['file_write', 'file_read', 'file_list', 'direct_response'];
 		const REMOTE_TOOLS = [
 			'browse', 'browser_navigate', 'browser_screenshot',
 			'http_fetch',

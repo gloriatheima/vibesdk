@@ -185,6 +185,7 @@ Available tools and their key params:
 - sandbox_run(command, envVars?, timeout?) — execute a shell command in the session sandbox container (Ubuntu 22.04, Node 20, Python 3.11, git pre-installed). Container is persistent per session. Pass envVars once to set env vars that persist for all future sandbox_run calls (e.g. { "ARTIFACTS_GIT_REMOTE": authRemote } before git push). Returns { stdout, stderr, exitCode, success }.
 - sandbox_write(path, content) — write a file directly to the sandbox container filesystem at the given absolute path. Safer than heredoc for large files.
 - sandbox_read(path) — read a file from the sandbox container filesystem.
+- direct_response(content) — use this when the task is purely conversational or informational and requires no external tools (e.g. tell a story, write a poem, explain a concept, answer a question). Returns the content directly to the user.
 
 IMPORTANT: Only use the tools listed above. Do NOT invent tool names or assume any other tools exist. If the result from a previous step already contains the answer, you do NOT need another tool step — the data can be read directly from the step result.
 

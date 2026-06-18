@@ -14,6 +14,10 @@ export class ToolExecutor {
 		const p = action.params;
 
 		switch (action.tool) {
+			case 'direct_response': {
+				return String(p.content ?? p.text ?? '');
+			}
+
 			case 'file_write': {
 				const filename = String(p.filename ?? '');
 				const content = String(p.content ?? '');
