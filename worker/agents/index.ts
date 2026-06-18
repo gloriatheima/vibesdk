@@ -137,8 +137,9 @@ async function handleAITemplateSelection(args: Omit<TemplateQueryArgs, 'selected
     const { env, inferenceContext, query, projectType, images, logger } = args;
 
     const templatesResponse = await SandboxSdkClient.listTemplates();
+    const availableTemplates = templatesResponse?.success ? templatesResponse.templates : [];
     if (!templatesResponse?.success) {
-        throw new Error(`Failed to fetch templates from sandbox service, ${templatesResponse.error}`);
+        logger.warn('Template catalog unavailable, falling back to scratch', { error: templatesResponse?.error });
     }
 
     const aiSelection = await selectTemplate({
@@ -146,7 +147,7 @@ async function handleAITemplateSelection(args: Omit<TemplateQueryArgs, 'selected
         inferenceContext,
         query,
         projectType,
-        availableTemplates: templatesResponse.templates,
+        availableTemplates,
         images,
     });
 
