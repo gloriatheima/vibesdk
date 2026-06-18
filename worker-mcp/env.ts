@@ -1,4 +1,5 @@
 import type { Sandbox as SandboxDO } from '@cloudflare/sandbox';
+import type { SandboxPool } from './pool';
 
 export interface ToolServerEnv {
 	DB: D1Database;
@@ -8,6 +9,7 @@ export interface ToolServerEnv {
 	WORDPRESS: Fetcher;
 	ARTIFACTS?: Artifacts;
 	Sandbox: DurableObjectNamespace<SandboxDO>;
+	SandboxPool: DurableObjectNamespace<SandboxPool>;
 	CLOUDFLARE_ACCOUNT_ID: string;
 	CLOUDFLARE_API_TOKEN: string;
 	EMAIL_FROM: string;

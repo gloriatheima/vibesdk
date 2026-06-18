@@ -14,6 +14,10 @@
 			{
 				"class_name": "Sandbox",
 				"name": "Sandbox"
+			},
+			{
+				"class_name": "SandboxPool",
+				"name": "SandboxPool"
 			}
 		]
 	},
@@ -21,8 +25,15 @@
 		{
 			"new_sqlite_classes": ["Sandbox"],
 			"tag": "v1"
+		},
+		{
+			"new_classes": ["SandboxPool"],
+			"tag": "v2"
 		}
 	],
+	"triggers": {
+		"crons": ["*/3 * * * *"]
+	},
 	"account_id": "fcaaec845fe02e091365a0103ea4b97f",
 	"main": "worker-mcp/index.ts",
 	"compatibility_date": "2025-08-10",
