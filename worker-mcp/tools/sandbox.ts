@@ -108,13 +108,26 @@ async function runExec(args: Record<string, unknown>, sandbox: SandboxInstance):
 		await sandbox.setEnvVars(args.envVars as Record<string, string>);
 	}
 
-	const result = await sandbox.exec(command, { timeout });
+	let result;
+	for (let attempt = 0; attempt <= 2; attempt++) {
+		try {
+			result = await sandbox.exec(command, { timeout });
+			break;
+		} catch (err) {
+			const is500 = err instanceof Error && err.message.includes('500');
+			if (is500 && attempt < 2) {
+				await new Promise(resolve => setTimeout(resolve, 4000 * (attempt + 1)));
+				continue;
+			}
+			throw err;
+		}
+	}
 
 	return JSON.stringify({
-		stdout: truncate(result.stdout, 10_000),
-		stderr: truncate(result.stderr, 5_000),
-		exitCode: result.exitCode,
-		success: result.success,
+		stdout: truncate(result!.stdout, 10_000),
+		stderr: truncate(result!.stderr, 5_000),
+		exitCode: result!.exitCode,
+		success: result!.success,
 	});
 }
 
