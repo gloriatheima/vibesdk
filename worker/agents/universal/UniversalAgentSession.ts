@@ -41,7 +41,6 @@ const logger = createLogger('UniversalAgentSession');
 export class UniversalAgentSession extends DurableObject<Env> {
 	private encoder = new TextEncoder();
 	private sseWriter: WritableStreamDefaultWriter<Uint8Array> | null = null;
-	private pendingEvents: SsePayload[] = [];
 	private processing = false;
 
 	async fetch(request: Request): Promise<Response> {
@@ -71,7 +70,7 @@ export class UniversalAgentSession extends DurableObject<Env> {
 		const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
 		this.sseWriter = writable.getWriter();
 
-		this.ctx.waitUntil(this.flushPendingEvents());
+		this.ctx.waitUntil(this.replayPersistedEvents());
 
 		return new Response(readable, {
 			headers: {
@@ -83,12 +82,17 @@ export class UniversalAgentSession extends DurableObject<Env> {
 		});
 	}
 
-	private async flushPendingEvents(): Promise<void> {
-		if (!this.sseWriter || this.pendingEvents.length === 0) return;
-		const events = [...this.pendingEvents];
-		this.pendingEvents = [];
+	private async replayPersistedEvents(): Promise<void> {
+		if (!this.sseWriter) return;
+		const stored = await this.ctx.storage.get<SsePayload[]>('events');
+		const events = stored ?? [];
 		for (const ev of events) {
 			await this.writeToSse(ev.type, ev.data);
+		}
+		const isDone = events.some(ev => ev.type === 'done' || ev.type === 'error');
+		if (isDone) {
+			await this.sseWriter.close().catch(() => {});
+			this.sseWriter = null;
 		}
 	}
 
@@ -233,10 +237,17 @@ export class UniversalAgentSession extends DurableObject<Env> {
 	}
 
 	private async emit(event: SsePayload): Promise<void> {
+		const stored = await this.ctx.storage.get<SsePayload[]>('events');
+		const events = stored ?? [];
+		events.push(event);
+		await this.ctx.storage.put('events', events);
+
 		if (this.sseWriter) {
 			await this.writeToSse(event.type, event.data);
-		} else {
-			this.pendingEvents.push(event);
+			if (event.type === 'done' || event.type === 'error') {
+				await this.sseWriter.close().catch(() => {});
+				this.sseWriter = null;
+			}
 		}
 	}
 
