@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router';
-import { ArrowLeft, CheckCircle, XCircle, Loader, ChevronDown, ChevronRight, File } from 'lucide-react';
+import { ArrowLeft, CheckCircle, XCircle, Loader, ChevronDown, ChevronRight, File, Rocket } from 'lucide-react';
 import clsx from 'clsx';
 import type {
 	ThinkingEventData,
@@ -12,6 +12,7 @@ import type {
 	ErrorEventData,
 	StatusEventData,
 	FileEventData,
+	DeployReadyEventData,
 	SessionFileEntry,
 } from '@/api-types';
 import { apiClient } from '@/lib/api-client';
@@ -31,6 +32,7 @@ interface AgentState {
 	actionLog: ActionEntry[];
 	reflections: ReflectEventData[];
 	files: SessionFileEntry[];
+	deployReady: DeployReadyEventData | null;
 	error: string | null;
 }
 
@@ -84,6 +86,10 @@ function applyEvent(state: AgentState, type: string, data: unknown): AgentState 
 				: [...state.files, { path: d.path, size: d.size }];
 			return { ...state, files };
 		}
+		case 'deploy_ready': {
+			const d = data as DeployReadyEventData;
+			return { ...state, deployReady: d };
+		}
 		default:
 			return state;
 	}
@@ -98,6 +104,7 @@ function useAgentStream(sessionId: string) {
 		actionLog: [],
 		reflections: [],
 		files: [],
+		deployReady: null,
 		error: null,
 	});
 
@@ -302,13 +309,24 @@ export default function AgentPage() {
 	const leftRef  = useRef<HTMLDivElement>(null);
 	const rightRef = useRef<HTMLDivElement>(null);
 
-	const { agentStatus, statusMessage, thinkingText, plan, actionLog, reflections, files, error } =
+	const { agentStatus, statusMessage, thinkingText, plan, actionLog, reflections, files, deployReady, error } =
 		useAgentStream(sessionId ?? '');
 
 	const [rightTab, setRightTab] = useState<'log' | 'files'>('log');
 	const [selectedFile, setSelectedFile] = useState<string | null>(null);
 	const [fileContent, setFileContent] = useState<string | null>(null);
 	const [loadingFile, setLoadingFile] = useState(false);
+	const [deploying, setDeploying] = useState(false);
+
+	const handleDeploy = async () => {
+		if (!sessionId || deploying) return;
+		setDeploying(true);
+		const result = await apiClient.deployAgentSession(sessionId, instruction);
+		setDeploying(false);
+		if (result.data?.appId) {
+			navigate(`/app/${result.data.appId}`);
+		}
+	};
 
 	const handleFileClick = async (filePath: string) => {
 		if (!sessionId) return;
@@ -352,6 +370,21 @@ export default function AgentPage() {
 						<p className="text-sm text-text-tertiary leading-tight">Session {sessionId.slice(0, 8)}…</p>
 					)}
 				</div>
+				{deployReady && (
+					<button
+						type="button"
+						onClick={() => void handleDeploy()}
+						disabled={deploying}
+						className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-medium hover:bg-accent/90 disabled:opacity-50 transition-colors"
+					>
+						{deploying ? (
+							<Loader className="size-3 animate-spin" />
+						) : (
+							<Rocket className="size-3" />
+						)}
+						{deploying ? 'Deploying…' : `Deploy as App (${deployReady.fileCount} files)`}
+					</button>
+				)}
 				<StatusBadge status={agentStatus} message={error ?? statusMessage} />
 			</div>
 

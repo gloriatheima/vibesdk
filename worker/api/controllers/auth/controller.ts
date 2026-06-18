@@ -295,7 +295,7 @@ export class AuthController extends BaseController {
             if (error instanceof SecurityError) {
                 return AuthController.createErrorResponse(error.message, error.statusCode);
             }
-            
+
             return AuthController.handleError(error, 'initiate OAuth');
         }
     }

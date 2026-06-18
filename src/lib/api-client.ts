@@ -58,6 +58,7 @@ import type{
 	VaultConfigResponse,
 	VaultStatusResponse,
 	SubmitAgentTaskResponse,
+	DeploySessionResponse,
 	SessionFilesResponse,
 	SessionFileContentResponse,
 } from '@/api-types';
@@ -1167,6 +1168,13 @@ class ApiClient {
 	 */
 	async submitAgentTask(instruction: string): Promise<ApiResponse<SubmitAgentTaskResponse>> {
 		return this.request<SubmitAgentTaskResponse>('/api/universal/tasks', {
+			method: 'POST',
+			body: { instruction },
+		});
+	}
+
+	async deployAgentSession(sessionId: string, instruction: string): Promise<ApiResponse<DeploySessionResponse>> {
+		return this.request<DeploySessionResponse>(`/api/universal/sessions/${sessionId}/deploy`, {
 			method: 'POST',
 			body: { instruction },
 		});

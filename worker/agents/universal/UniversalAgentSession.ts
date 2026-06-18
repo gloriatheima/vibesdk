@@ -3,6 +3,7 @@ import { createLogger } from '../../logger';
 import { runPlannerBrain, runExecutorBrain, runReflectorBrain } from '../inferutils/workersai';
 import { ToolExecutor } from './tools/executor';
 import { MCPClient } from './mcp/client';
+import { getAgentStub } from '../index';
 import type {
 	AgentTaskPayload,
 	SseEventType,
@@ -16,6 +17,7 @@ import type {
 	ToolResultEventData,
 	ReflectEventData,
 	FileEventData,
+	DeployReadyEventData,
 	ConversationTurn,
 } from './types';
 
@@ -31,6 +33,7 @@ type SsePayload =
 	| { type: 'text'; data: TextEventData }
 	| { type: 'status'; data: StatusEventData }
 	| { type: 'done'; data: DoneEventData }
+	| { type: 'deploy_ready'; data: DeployReadyEventData }
 	| { type: 'error'; data: ErrorEventData };
 
 const logger = createLogger('UniversalAgentSession');
@@ -89,6 +92,31 @@ export class UniversalAgentSession extends DurableObject<Env> {
 		}
 	}
 
+	async deploySession(userId: string, instruction: string, sessionId: string): Promise<{ appId: string; previewUrl: string | null }> {
+		const prefix = `sessions/${sessionId}/`;
+		const listed = await this.env.SESSION_FILES_BUCKET.list({ prefix });
+		const files = await Promise.all(
+			listed.objects.map(async (obj) => {
+				const object = await this.env.SESSION_FILES_BUCKET.get(obj.key);
+				const fileContents = object ? await object.text() : '';
+				return {
+					filePath: obj.key.slice(prefix.length),
+					fileContents,
+					filePurpose: 'agent-generated',
+				};
+			}),
+		);
+
+		if (files.length === 0) {
+			return { appId: '', previewUrl: null };
+		}
+
+		const appAgentId = sessionId;
+		const agentStub = await getAgentStub(this.env, appAgentId);
+		const result = await agentStub.deployFromFiles(files, userId, instruction, appAgentId);
+		return { appId: appAgentId, previewUrl: result.previewUrl };
+	}
+
 	// Full Planner → Executor → Tool → Reflect loop (up to MAX_ITERATIONS).
 	private async runOrchestrationLoop(payload: AgentTaskPayload): Promise<void> {
 		const fileExecutor = new ToolExecutor(this.env, payload.sessionId);
@@ -109,6 +137,7 @@ export class UniversalAgentSession extends DurableObject<Env> {
 
 		const history: ConversationTurn[] = [];
 		let currentInstruction = payload.instruction;
+		const writtenFiles: string[] = [];
 
 		try {
 			for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
@@ -148,9 +177,11 @@ export class UniversalAgentSession extends DurableObject<Env> {
 					await this.emit({ type: 'result', data: result });
 					if (action.tool === 'file_write' && action.params.filename) {
 						const content = String(action.params.content ?? '');
+						const filename = String(action.params.filename);
+						writtenFiles.push(filename);
 						await this.emit({
 							type: 'file',
-							data: { path: String(action.params.filename), size: content.length },
+							data: { path: filename, size: content.length },
 						});
 					}
 				}
@@ -173,6 +204,12 @@ export class UniversalAgentSession extends DurableObject<Env> {
 
 				if (reflection.isDone) {
 					logger.info('Task marked done by reflector', { iteration, taskId: payload.taskId });
+					if (writtenFiles.length > 0) {
+						await this.emit({
+							type: 'deploy_ready',
+							data: { sessionId: payload.sessionId, fileCount: writtenFiles.length },
+						});
+					}
 					break;
 				}
 

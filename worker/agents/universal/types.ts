@@ -16,6 +16,7 @@ export type SseEventType =
 	| 'text'
 	| 'status'
 	| 'done'
+	| 'deploy_ready'
 	| 'error';
 
 export interface ThinkingEventData {
@@ -74,6 +75,11 @@ export interface ReflectEventData {
 export interface FileEventData {
 	path: string;
 	size: number;
+}
+
+export interface DeployReadyEventData {
+	sessionId: string;
+	fileCount: number;
 }
 
 export interface ConversationTurn {

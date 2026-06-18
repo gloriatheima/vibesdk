@@ -46,8 +46,9 @@ export function createApp(env: Env): Hono<AppEnv> {
             if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') {
                 await next();
                 
-                // Only set CSRF token for successful API responses
-                if (c.req.url.startsWith('/api/') && c.res.status < 400) {
+                // Only set CSRF token for successful non-redirect API responses
+                // Skip for 3xx: Response.redirect() returns immutable headers
+                if (c.req.url.startsWith('/api/') && c.res.status >= 200 && c.res.status < 300) {
                     await CsrfService.enforce(c.req.raw, c.res);
                 }
                 

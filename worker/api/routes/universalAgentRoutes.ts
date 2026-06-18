@@ -7,35 +7,6 @@ import type { UniversalAgentSession } from '../../agents/universal/UniversalAgen
 
 export function setupUniversalAgentRoutes(app: Hono<AppEnv>): void {
 	// ========================================
-	// DEV TEST — remove before production
-	// GET /api/universal/_test/stream?instruction=...
-	// Bypasses auth+queue; calls DO directly to verify dual-brain + SSE.
-	// ========================================
-	app.get('/api/universal/_test/stream', setAuthLevel(AuthConfig.public), async (c) => {
-		const instruction = c.req.query('instruction') ?? 'Write a hello world Python script';
-		const sessionId = generateId();
-		const taskId = generateId();
-
-		const payload: AgentTaskPayload = {
-			taskId,
-			sessionId,
-			userId: 'dev-test',
-			instruction,
-			timestamp: Date.now(),
-		};
-
-		const doId = c.env.UniversalAgentSession.idFromName(sessionId);
-		const stub = c.env.UniversalAgentSession.get(doId) as DurableObjectStub<UniversalAgentSession>;
-
-		// Kick off processing before opening the stream so events are buffered in DO.
-		c.executionCtx.waitUntil(stub.processTask(payload));
-
-		const streamUrl = new URL(c.req.url);
-		streamUrl.pathname = '/stream';
-		return stub.fetch(new Request(streamUrl.toString(), { headers: { Accept: 'text/event-stream' } }));
-	});
-
-	// ========================================
 	// UNIVERSAL AGENT ROUTES
 	// ========================================
 
@@ -77,7 +48,7 @@ export function setupUniversalAgentRoutes(app: Hono<AppEnv>): void {
 
 			await c.env.AGENT_TASK_QUEUE.send(payload);
 
-			return c.json({ taskId, sessionId }, 202);
+			return c.json({ success: true, data: { taskId, sessionId } }, 202);
 		},
 	);
 
@@ -119,6 +90,38 @@ export function setupUniversalAgentRoutes(app: Hono<AppEnv>): void {
 
 			const content = await object.text();
 			return c.json({ path: filePath, content });
+		},
+	);
+
+	// Deploy session files as an App via CodeGeneratorAgent sandbox pipeline.
+	app.post(
+		'/api/universal/sessions/:sessionId/deploy',
+		setAuthLevel(AuthConfig.authenticated),
+		async (c) => {
+			const authResult = await enforceAuthRequirement(c);
+			if (authResult) return authResult;
+
+			const user = c.get('user');
+			if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+			const sessionId = c.req.param('sessionId');
+			if (!sessionId) return c.json({ error: 'sessionId is required' }, 400);
+
+			let instruction = '';
+			try {
+				const body = await c.req.json<{ instruction?: string }>();
+				instruction = body.instruction?.trim() ?? '';
+			} catch { /* instruction stays empty */ }
+
+			const doId = c.env.UniversalAgentSession.idFromName(sessionId);
+			const stub = c.env.UniversalAgentSession.get(doId) as DurableObjectStub<UniversalAgentSession>;
+
+			const result = await stub.deploySession(user.id, instruction, sessionId);
+			if (!result.appId) {
+				return c.json({ error: 'No files found for this session' }, 404);
+			}
+
+			return c.json({ appId: result.appId, previewUrl: result.previewUrl });
 		},
 	);
 

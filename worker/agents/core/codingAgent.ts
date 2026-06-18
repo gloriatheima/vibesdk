@@ -348,7 +348,42 @@ export class CodeGeneratorAgent extends Agent<Env, AgentState> implements AgentI
     importTemplate(templateName: string): Promise<{ templateName: string; filesImported: number }> {
         return this.behavior.importTemplate(templateName);
     }
-    
+
+    async deployFromFiles(
+        files: FileOutputType[],
+        userId: string,
+        instruction: string,
+        agentId: string,
+    ): Promise<{ previewUrl: string | null }> {
+        this.setState({
+            ...this.state,
+            query: instruction,
+            metadata: { agentId, userId },
+        });
+
+        const appService = new AppService(this.env);
+        await appService.createApp({
+            id: agentId,
+            userId,
+            title: instruction.substring(0, 80),
+            originalPrompt: instruction,
+            visibility: 'private',
+            status: 'generating',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+        });
+
+        try {
+            const result = await this.deploymentManager.deployToSandbox(files, false, 'Deploy from Universal Agent');
+            if (result?.previewURL) {
+                await appService.updateApp(agentId, { status: 'completed' });
+            }
+            return { previewUrl: result?.previewURL ?? null };
+        } catch {
+            return { previewUrl: null };
+        }
+    }
+
     protected async saveToDatabase() {
         this.logger().info(`Saving agent ${this.getAgentId()} to database`);
         // Save the app to database (authenticated users only)

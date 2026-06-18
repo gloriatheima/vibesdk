@@ -224,12 +224,18 @@ export type {
 	ToolResultEventData,
 	ReflectEventData,
 	FileEventData,
+	DeployReadyEventData,
 	TaskStep,
 } from 'worker/agents/universal/types';
 
 export interface SubmitAgentTaskResponse {
 	taskId: string;
 	sessionId: string;
+}
+
+export interface DeploySessionResponse {
+	appId: string;
+	previewUrl: string | null;
 }
 
 export interface SessionFileEntry {
