@@ -1,6 +1,8 @@
 import type { ToolServerEnv } from './env';
 import { handleMcpRequest } from './router';
 
+export { Sandbox } from '@cloudflare/sandbox';
+
 export default {
 	async fetch(request: Request, env: ToolServerEnv): Promise<Response> {
 		if (request.method === 'OPTIONS') {

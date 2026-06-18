@@ -178,6 +178,13 @@ Available tools and their key params:
 - file_list() — list all in-memory files
 - call_worker(name, path, method?, body?, headers?) — call a Worker in the platform dispatch namespace (Workers for Platforms)
 - call_service(binding, path, method?, body?, headers?) — call a private internal service via Workers VPC binding
+- artifact_create(name, description?) — create a versioned git repo in Cloudflare Artifacts; returns { remote, writeToken, authRemote, readToken, defaultBranch }. Use authRemote inside a sandbox for git push. Give readToken to the user for git clone.
+- artifact_get_token(name, scope?, ttl?) — mint a new access token for an existing Artifacts repo; scope="read"|"write", ttl in seconds
+- artifact_list(limit?) — list all Artifacts repos in the namespace
+- artifact_delete(name) — permanently delete an Artifacts repo
+- sandbox_run(command, envVars?, timeout?) — execute a shell command in the session sandbox container (Ubuntu 22.04, Node 20, Python 3.11, git pre-installed). Container is persistent per session. Pass envVars once to set env vars that persist for all future sandbox_run calls (e.g. { "ARTIFACTS_GIT_REMOTE": authRemote } before git push). Returns { stdout, stderr, exitCode, success }.
+- sandbox_write(path, content) — write a file directly to the sandbox container filesystem at the given absolute path. Safer than heredoc for large files.
+- sandbox_read(path) — read a file from the sandbox container filesystem.
 
 IMPORTANT: Only use the tools listed above. Do NOT invent tool names or assume any other tools exist. If the result from a previous step already contains the answer, you do NOT need another tool step — the data can be read directly from the step result.
 

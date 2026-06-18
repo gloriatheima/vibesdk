@@ -5,6 +5,8 @@ import * as email from './tools/email';
 import * as http from './tools/http';
 import * as dispatch from './tools/dispatch';
 import * as service from './tools/service';
+import * as artifacts from './tools/artifacts';
+import * as sandbox from './tools/sandbox';
 
 const ALL_TOOL_DEFINITIONS: McpTool[] = [
 	...browser.TOOL_DEFINITIONS,
@@ -12,6 +14,8 @@ const ALL_TOOL_DEFINITIONS: McpTool[] = [
 	...http.TOOL_DEFINITIONS,
 	...dispatch.TOOL_DEFINITIONS,
 	...service.TOOL_DEFINITIONS,
+	...artifacts.TOOL_DEFINITIONS,
+	...sandbox.TOOL_DEFINITIONS,
 ];
 
 type ToolModule = {
@@ -24,6 +28,8 @@ for (const def of email.TOOL_DEFINITIONS) TOOL_MODULE_MAP[def.name] = email;
 for (const def of http.TOOL_DEFINITIONS) TOOL_MODULE_MAP[def.name] = http;
 for (const def of dispatch.TOOL_DEFINITIONS) TOOL_MODULE_MAP[def.name] = dispatch;
 for (const def of service.TOOL_DEFINITIONS) TOOL_MODULE_MAP[def.name] = service;
+for (const def of artifacts.TOOL_DEFINITIONS) TOOL_MODULE_MAP[def.name] = artifacts;
+for (const def of sandbox.TOOL_DEFINITIONS) TOOL_MODULE_MAP[def.name] = sandbox;
 
 function ok(id: number, result: unknown): McpResponse {
 	return { jsonrpc: '2.0', id, result: result as McpResponse['result'] };

@@ -1,6 +1,28 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "vibesdk-tool-server",
+	"containers": [
+		{
+			"class_name": "Sandbox",
+			"image": "./worker-mcp/Dockerfile",
+			"instance_type": "standard-4",
+			"max_instances": 10
+		}
+	],
+	"durable_objects": {
+		"bindings": [
+			{
+				"class_name": "Sandbox",
+				"name": "Sandbox"
+			}
+		]
+	},
+	"migrations": [
+		{
+			"new_sqlite_classes": ["Sandbox"],
+			"tag": "v1"
+		}
+	],
 	"account_id": "fcaaec845fe02e091365a0103ea4b97f",
 	"main": "worker-mcp/index.ts",
 	"compatibility_date": "2025-08-10",
@@ -45,6 +67,12 @@
 		{
 			"binding": "WORDPRESS",
 			"service_id": "019ecea8-c7c3-7aa3-8697-542ccb904fdc"
+		}
+	],
+	"artifacts": [
+		{
+			"binding": "ARTIFACTS",
+			"namespace": "default"
 		}
 	]
 }

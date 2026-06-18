@@ -10,9 +10,19 @@ export interface McpToolsCallParams {
 	arguments: Record<string, unknown>;
 }
 
+export interface McpPropertySchema {
+	type: string;
+	description?: string;
+	enum?: string[];
+	additionalProperties?: McpPropertySchema | boolean;
+	items?: McpPropertySchema;
+	properties?: Record<string, McpPropertySchema>;
+	required?: string[];
+}
+
 export interface McpToolInputSchema {
 	type: 'object';
-	properties: Record<string, { type: string; description?: string; enum?: string[] }>;
+	properties: Record<string, McpPropertySchema>;
 	required?: string[];
 }
 
