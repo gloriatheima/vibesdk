@@ -33,7 +33,7 @@ export default {
 		await Promise.allSettled(
 			slotIds.map((id) => {
 				const sandbox = getSandbox(env.Sandbox, id);
-				return sandbox.exec('echo "keepalive"', { timeout: 10 });
+				return sandbox.exec('echo "keepalive"', { timeout: 90 });
 			}),
 		);
 	},

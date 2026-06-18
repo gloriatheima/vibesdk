@@ -137,7 +137,8 @@ async function runExec(args: Record<string, unknown>, sandbox: SandboxInstance):
 		} catch (err) {
 			const is500 = err instanceof Error && err.message.includes('500');
 			if (is500 && attempt < 2) {
-				await new Promise(resolve => setTimeout(resolve, 4000 * (attempt + 1)));
+				const waitMs = [10_000, 20_000][attempt];
+				await new Promise(resolve => setTimeout(resolve, waitMs));
 				continue;
 			}
 			throw err;
