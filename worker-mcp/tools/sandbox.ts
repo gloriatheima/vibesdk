@@ -209,11 +209,12 @@ async function runExec(args: Record<string, unknown>, sandbox: SandboxInstance):
 }
 
 async function runWrite(args: Record<string, unknown>, sandbox: SandboxInstance): Promise<string> {
-	const path = str(args.path ?? args.filename);
+	let path = str(args.path ?? args.filename);
 	const content = str(args.content);
 	if (!path) throw new Error('sandbox_write requires path');
+	if (!path.startsWith('/')) path = `/workspace/${path}`;
 
-	const dir = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';
+	const dir = path.slice(0, path.lastIndexOf('/'));
 	if (dir) {
 		await withContainerRetry(() => sandbox.exec(`mkdir -p "${dir}"`, { timeout: 30 }));
 	}

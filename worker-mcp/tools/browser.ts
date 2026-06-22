@@ -134,7 +134,13 @@ async function runBrowserScrape(args: Record<string, unknown>, env: ToolServerEn
 	const url = str(args.url);
 	if (!url) throw new Error('browser_scrape requires url');
 
-	const rawSelectors = args.selectors;
+	let rawSelectors: unknown = args.selectors;
+	if (typeof rawSelectors === 'string') {
+		try { rawSelectors = JSON.parse(rawSelectors); } catch { /* ignore */ }
+		if (typeof rawSelectors === 'string') {
+			rawSelectors = rawSelectors.split(',').map((s) => s.trim()).filter(Boolean);
+		}
+	}
 	if (!Array.isArray(rawSelectors) || rawSelectors.length === 0) {
 		throw new Error('browser_scrape requires a non-empty selectors array');
 	}

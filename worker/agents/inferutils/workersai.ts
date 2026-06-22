@@ -315,7 +315,9 @@ One JSON object per line. No markdown, no explanations, no extra text.
 
 CRITICAL RULES:
 - ALWAYS follow the plan exactly. Execute every step as specified.
-- For sandbox_write steps, generate the COMPLETE file content yourself based on the step description. Never leave content empty.
+- Each action MUST fit on a single line. All strings in params must use JSON escape sequences (\n for newline, \t for tab, \'  — NEVER actual newlines inside a JSON string value).
+- For sandbox_write steps, generate the COMPLETE file content yourself. Use absolute paths starting with /workspace/ (e.g. /workspace/app.py). Never leave content empty.
+- For worker_deploy steps, the script must be a valid Cloudflare Worker ES module. Use only single-quoted strings and \n for line breaks. NEVER use backtick template literals. NEVER use multi-line strings. Minimal valid Hono template: import{Hono}from'https://esm.sh/hono@3';const app=new Hono();app.get('/',(c)=>c.json({ok:true}));export default app;
 - NEVER use direct_response to ask the user for clarification or more information. If a step is unclear, make your best attempt to execute it.
 - NEVER skip steps or replace code-execution steps with direct_response.`;
 
