@@ -160,7 +160,10 @@ async function runBrowserScrape(args: Record<string, unknown>, env: ToolServerEn
 	});
 
 	const body: Record<string, unknown> = { url, elements };
-	if (args.wait_for) body.waitForSelector = str(args.wait_for);
+	if (args.wait_for) {
+		const firstSelector = str(args.wait_for).split(',')[0].trim();
+		if (firstSelector) body.waitForSelector = firstSelector;
+	}
 
 	const resp = await fetch(
 		`https://api.cloudflare.com/client/v4/accounts/${accountId}/browser-rendering/scrape`,
@@ -174,7 +177,7 @@ async function runBrowserScrape(args: Record<string, unknown>, env: ToolServerEn
 	const json = (await resp.json()) as ScrapeResult;
 	if (!resp.ok || json.success === false) {
 		const errMsg = json.errors?.map((e) => e.message).filter(Boolean).join('; ');
-		throw new Error(`browser_scrape ${resp.status}: ${errMsg ?? 'unknown error'}`);
+		throw new Error(`browser_scrape ${resp.status}: ${errMsg ?? JSON.stringify(json).slice(0, 200)}`);
 	}
 
 	return truncate(JSON.stringify(json.result?.elements ?? []), MAX_BROWSER_BYTES);
