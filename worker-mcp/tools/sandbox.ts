@@ -161,7 +161,7 @@ export async function executeTool(
 type SandboxInstance = ReturnType<typeof getSandbox>;
 
 const CONTAINER_ERROR_PATTERNS = ['Unknown Error', 'container not ready', 'provisioning'];
-const RETRY_DELAYS_MS = [5_000, 10_000];
+const RETRY_DELAYS_MS = [5_000, 10_000, 20_000];
 
 function isContainerError(err: unknown): boolean {
 	if (!(err instanceof Error)) return false;
@@ -215,7 +215,7 @@ async function runWrite(args: Record<string, unknown>, sandbox: SandboxInstance)
 	if (!path.startsWith('/')) path = `/workspace/${path}`;
 
 	const dir = path.slice(0, path.lastIndexOf('/'));
-	if (dir) {
+	if (dir && dir !== '/workspace') {
 		await withContainerRetry(() => sandbox.exec(`mkdir -p "${dir}"`, { timeout: 30 }));
 	}
 
