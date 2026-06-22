@@ -119,7 +119,7 @@ async function runBrowserContent(args: Record<string, unknown>, env: ToolServerE
 	const body: Record<string, unknown> = { url };
 	if (args.wait_for) {
 		const sel = str(args.wait_for).split(',')[0].trim();
-		if (sel) body.waitForSelector = sel;
+		if (sel) body.waitForSelector = { selector: sel };
 	}
 
 	const resp = await fetch(
@@ -177,7 +177,7 @@ interface ScrapeElement {
 
 interface ScrapeResult {
 	success?: boolean;
-	result?: { elements: ScrapeElement[] };
+	result?: ScrapeElement[];
 	errors?: Array<{ message?: string }>;
 }
 
@@ -213,7 +213,7 @@ async function runBrowserScrape(args: Record<string, unknown>, env: ToolServerEn
 	const body: Record<string, unknown> = { url, elements };
 	if (args.wait_for) {
 		const firstSelector = str(args.wait_for).split(',')[0].trim();
-		if (firstSelector) body.waitForSelector = firstSelector;
+		if (firstSelector) body.waitForSelector = { selector: firstSelector };
 	}
 
 	const resp = await fetch(
@@ -231,7 +231,7 @@ async function runBrowserScrape(args: Record<string, unknown>, env: ToolServerEn
 		throw new Error(`browser_scrape ${resp.status}: ${errMsg ?? JSON.stringify(json).slice(0, 200)}`);
 	}
 
-	return truncate(JSON.stringify(json.result?.elements ?? []), MAX_BROWSER_BYTES);
+	return truncate(JSON.stringify(json.result ?? []), MAX_BROWSER_BYTES);
 }
 
 async function runBrowserScreenshot(args: Record<string, unknown>, env: ToolServerEnv): Promise<string> {
