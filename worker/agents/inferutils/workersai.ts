@@ -171,7 +171,7 @@ Available tools and their key params:
 - browser_navigate(url, format?) — navigate browser; format='content'(default)|'markdown'
 - browse(url) — navigate and return page as Markdown (preferred for reading web content)
 - browser_screenshot(url, width?, height?) — take a screenshot, returns base64 PNG data URL
-- email_send(to, subject, body, from?, html?) — send an outbound email via SEND_EMAIL binding
+- email_send(to, subject, body, from?, html?) — send an outbound email via SEND_EMAIL binding. The body param must contain the actual text content to send, not template variables or references to other steps.
 - email_inbox(limit?, since_ms?) — list received emails for this session
 - email_read(id) — read full body of an inbox message by message_id
 - file_write(filename, content) — write content to in-memory file
