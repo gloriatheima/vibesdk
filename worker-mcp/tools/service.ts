@@ -61,7 +61,14 @@ export async function executeTool(
 	});
 
 	const resp = await fetcher.fetch(req);
-	const text = await resp.text();
+	let text = await resp.text();
+
+	const hostHeader = extraHeaders['Host'] || extraHeaders['host'];
+	if (hostHeader && text.includes('service.local')) {
+		text = text.replaceAll(`https://service.local`, `https://${hostHeader}`);
+		text = text.replaceAll(`http://service.local`, `https://${hostHeader}`);
+		text = text.replaceAll('service.local', hostHeader);
+	}
 
 	return JSON.stringify({
 		status: resp.status,
