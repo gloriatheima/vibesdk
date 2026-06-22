@@ -6,6 +6,7 @@ const logger = createLogger('WorkersAI');
 export const PLANNER_MODEL = '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b';
 export const EXECUTOR_MODEL = '@cf/qwen/qwen2.5-coder-32b-instruct';
 export const CLAUDE_MODEL = 'claude-sonnet-4-5';
+export const CLAUDE_HAIKU_MODEL = 'claude-haiku-4-5';
 
 type ChatMessage = {
 	role: 'system' | 'user' | 'assistant';
@@ -88,6 +89,7 @@ async function runClaudeStream(
 	systemPrompt: string,
 	userMessage: string,
 	maxTokens = 8096,
+	model = CLAUDE_MODEL,
 ): Promise<ReadableStream<Uint8Array>> {
 	const url = `https://gateway.ai.cloudflare.com/v1/${env.CLOUDFLARE_ACCOUNT_ID}/${env.CLOUDFLARE_AI_GATEWAY}/anthropic/v1/messages`;
 
@@ -99,7 +101,7 @@ async function runClaudeStream(
 			'anthropic-version': '2023-06-01',
 		},
 		body: JSON.stringify({
-			model: CLAUDE_MODEL,
+			model,
 			max_tokens: maxTokens,
 			system: systemPrompt,
 			messages: [{ role: 'user', content: userMessage }],
@@ -236,13 +238,7 @@ Think in terms of real software projects. Do not generate boilerplate from scrat
 
 Do NOT hand-write React/Vue boilerplate (main.tsx, vite.config.ts, tsconfig.json, index.html) — the scaffolder creates these correctly. Only write the application-specific code the user asked for.
 
-IMPORTANT: Only use the tools listed above. Do NOT invent tool names or assume any other tools exist. If the result from a previous step already contains the answer, you do NOT need another tool step — the data can be read directly from the step result. When a step involves writing code, include the COMPLETE code in the params — never leave content empty or as a description.
-
-HARD PROHIBITIONS:
-- NEVER use shell commands (mail, sendmail, curl, mutt) or Python smtplib/SMTP to send email. The ONLY permitted email tool is email_send. Any plan that includes shell_exec/sandbox_run for sending email is WRONG.
-- NEVER use npm, pip, or any package manager to send email. Use email_send directly.
-
-Copy all identifiers from the instruction EXACTLY as written — email addresses, URLs, usernames, phone numbers, file names, domain names. Never paraphrase, abbreviate, or alter them. CRITICAL: verify every digit in an email address before including it in the plan (e.g. caofang2013 is NOT caofang213).
+Only use the tools listed above. When a step involves writing code or content, include the COMPLETE content in the params — never leave it empty or as a placeholder.
 
 Output nothing except the JSON blueprint after the thinking block. No markdown, no explanation.`;
 
@@ -319,17 +315,15 @@ You receive a JSON task plan. For each step, output a single-line JSON action ob
 
 One JSON object per line. No markdown, no explanations, no extra text.
 
-CRITICAL RULES:
-- ALWAYS follow the plan exactly. Execute every step as specified.
-- Each action MUST fit on a single line. All strings in params must use JSON escape sequences (\\n for newline, \\t for tab — NEVER actual newlines inside a JSON string value).
-- NEVER use template variables like {{stepN.output}} or {{step2.content}} in params. You cannot reference previous step outputs — all param values must be concrete strings you generate yourself.
-- For sandbox_write steps, generate the COMPLETE file content yourself inline. Use absolute paths starting with /workspace/ (e.g. /workspace/app.py). Never leave content empty or use placeholders.
-- When writing Python, every variable assignment must have a value (e.g. \`articles = []\` not \`articles =\`). Every code block must be syntactically complete.
-- For browser_scrape, selectors must be a JSON array of CSS selector strings: ["h2 a", "h3 a"]. NEVER use an object like {"key": "selector"}.
-- For worker_deploy steps, the script must be a valid Cloudflare Worker ES module. Use only single-quoted strings and \\n for line breaks. NEVER use backtick template literals. NEVER use multi-line strings. Minimal valid Hono template: import{Hono}from'https://esm.sh/hono@3';const app=new Hono();app.get('/',(c)=>c.json({ok:true}));export default app;
-- Email addresses, phone numbers, URLs, usernames, and numeric IDs MUST be copied character-by-character from the plan. Never add, remove, or transpose any digit or letter.
-- NEVER use direct_response to ask the user for clarification or more information. If a step is unclear, make your best attempt to execute it.
-- NEVER skip steps or replace code-execution steps with direct_response.`;
+RULES:
+- Follow the plan exactly. Execute every step.
+- Each action MUST be a single line. Use JSON escape sequences (\\n for newlines) — NEVER actual newlines inside a JSON string value.
+- All param values must be concrete — NEVER use template variables like {{step1.output}}. Generate all content yourself.
+- For sandbox_write, generate complete file content inline. Use absolute paths like /workspace/app.py.
+- For browser_scrape, selectors must be a JSON array: ["h2 a", ".price"]. Never use an object.
+- For worker_deploy, the script must be a valid Cloudflare Worker ES module. All code on one line (\\n for breaks). Minimal Hono example: import{Hono}from'https://esm.sh/hono@3';const app=new Hono();app.get('/',(c)=>c.json({ok:true}));export default app;
+- Copy all identifiers (email, URL, phone, filename) exactly as written in the plan.
+- Never use direct_response to ask for clarification. Never skip steps.`;
 
 export type ExecutorCallbacks = {
 	onAction: (action: ActionEventData) => Promise<void>;
@@ -352,7 +346,7 @@ export async function runExecutorBrain(
 		},
 	];
 
-	const stream = await runWorkersAiStream(env.AI, EXECUTOR_MODEL, messages, 8192);
+	const stream = await runClaudeStream(env, EXECUTOR_SYSTEM_PROMPT, messages[1].content, 8192, CLAUDE_HAIKU_MODEL);
 	const collectedActions: ActionEventData[] = [];
 	let lineBuffer = '';
 
@@ -375,7 +369,13 @@ export async function runExecutorBrain(
 		}
 	};
 
-	for await (const token of parseWorkersAiSse(stream)) {
+	let insideThink = false;
+	for await (const token of parseAnthropicSse(stream)) {
+		if (token.includes('<think>')) { insideThink = true; }
+		if (insideThink) {
+			if (token.includes('</think>')) insideThink = false;
+			continue;
+		}
 		await callbacks.onText(token);
 
 		lineBuffer += token;

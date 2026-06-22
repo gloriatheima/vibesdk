@@ -141,6 +141,10 @@ async function runBrowserScrape(args: Record<string, unknown>, env: ToolServerEn
 			rawSelectors = rawSelectors.split(',').map((s) => s.trim()).filter(Boolean);
 		}
 	}
+	if (rawSelectors !== null && typeof rawSelectors === 'object' && !Array.isArray(rawSelectors)) {
+		rawSelectors = Object.values(rawSelectors as Record<string, string>)
+			.flatMap(v => String(v).split(',').map(s => s.trim()).filter(Boolean));
+	}
 	if (!Array.isArray(rawSelectors) || rawSelectors.length === 0) {
 		throw new Error('browser_scrape requires a non-empty selectors array');
 	}

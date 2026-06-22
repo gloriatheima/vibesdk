@@ -124,6 +124,21 @@ function useAgentStream(sessionId: string) {
 
 	useEffect(() => {
 		if (!sessionId) return;
+		apiClient.getSessionFiles(sessionId).then(res => {
+			if (res.data?.files?.length) {
+				setState(s => {
+					const merged = [...s.files];
+					for (const f of res.data!.files) {
+						if (!merged.some(e => e.path === f.path)) merged.push(f);
+					}
+					return { ...s, files: merged };
+				});
+			}
+		}).catch(() => {});
+	}, [sessionId]);
+
+	useEffect(() => {
+		if (!sessionId) return;
 		const controller = new AbortController();
 
 		async function consume() {
