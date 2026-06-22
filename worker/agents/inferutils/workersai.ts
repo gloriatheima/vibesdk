@@ -178,7 +178,7 @@ Available tools — grouped by category. Choose the most appropriate tool based 
 - http_fetch(url, method?, body?) — make a raw HTTP request and return the full response. Use when you need POST/PUT/DELETE or need the raw response headers/status.
 
 [EMAIL]
-- email_send(to, subject, body, from?, html?) — send an email using the platform's built-in email service. This is the ONLY way to send emails — never use shell commands like mail, sendmail, or curl. The body must contain the actual text to send, not template variables.
+- email_send(to, subject, body, from?, html?) — send an email using the platform's built-in email service. This is the ONLY way to send emails — never use shell commands like mail, sendmail, or curl. 'body' is the required plain-text fallback. If sending an HTML page or formatted content, put the full HTML in the 'html' param — do NOT put raw HTML tags or markdown code fences in 'body'.
 - email_inbox(limit?, since_ms?) — list received emails for this session.
 - email_read(id) — read the full body of an email by message_id.
 
@@ -322,6 +322,7 @@ CRITICAL RULES:
 - When writing Python, every variable assignment must have a value (e.g. \`articles = []\` not \`articles =\`). Every code block must be syntactically complete.
 - For browser_scrape, selectors must be a JSON array of CSS selector strings: ["h2 a", "h3 a"]. NEVER use an object like {"key": "selector"}.
 - For worker_deploy steps, the script must be a valid Cloudflare Worker ES module. Use only single-quoted strings and \\n for line breaks. NEVER use backtick template literals. NEVER use multi-line strings. Minimal valid Hono template: import{Hono}from'https://esm.sh/hono@3';const app=new Hono();app.get('/',(c)=>c.json({ok:true}));export default app;
+- Email addresses, phone numbers, URLs, usernames, and numeric IDs MUST be copied character-by-character from the plan. Never add, remove, or transpose any digit or letter.
 - NEVER use direct_response to ask the user for clarification or more information. If a step is unclear, make your best attempt to execute it.
 - NEVER skip steps or replace code-execution steps with direct_response.`;
 
