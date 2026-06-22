@@ -285,9 +285,14 @@ export default function AgentPage() {
 	const hasSandboxResult = sandboxEntries.some(e => e.result !== null);
 	const isRunning = agentStatus === 'connecting' || agentStatus === 'running';
 
+	const hasHtmlFile = !!htmlFile;
+	const autoSwitched = useRef(false);
 	useEffect(() => {
-		if ((htmlFile || hasSandboxResult) && view !== 'preview') setView('preview');
-	}, [!!htmlFile, hasSandboxResult]);
+		if ((hasHtmlFile || hasSandboxResult) && !autoSwitched.current) {
+			autoSwitched.current = true;
+			setView('preview');
+		}
+	}, [hasHtmlFile, hasSandboxResult]);
 
 	useEffect(() => {
 		chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight, behavior: 'smooth' });
