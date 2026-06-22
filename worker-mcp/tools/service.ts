@@ -30,7 +30,7 @@ export async function executeTool(
 ): Promise<string> {
 	if (name !== 'call_service') throw new Error(`service: unknown tool ${name}`);
 
-	const bindingName = str(args.binding);
+	const bindingName = str(args.binding).toUpperCase();
 	const path = str(args.path || '/');
 	const method = str(args.method || 'GET').toUpperCase();
 	const body = args.body !== undefined ? str(args.body) : undefined;

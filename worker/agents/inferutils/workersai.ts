@@ -192,7 +192,7 @@ Available tools — grouped by category. Choose the most appropriate tool based 
 
 [PLATFORM WORKERS & SERVICES]
 - call_worker(name, path, method?, body?, headers?) — invoke a Worker already deployed in the platform dispatch namespace. Returns { status, body }.
-- call_service(binding, path, method?, body?, headers?) — call a private internal service via Workers VPC binding (e.g. internal databases, WordPress, ClickHouse).
+- call_service(binding, path, method?, body?, headers?) — call a private internal service via Workers VPC binding (e.g. internal databases, WordPress, ClickHouse). Binding names are ALWAYS UPPERCASE (e.g. use "WORDPRESS" not "wordpress"). For WordPress REST API use paths like /wp-json/wp/v2/posts?per_page=5.
 - worker_deploy(name, script) — deploy a Cloudflare Worker ES module to the platform dispatch namespace. Returns { name, url } where url is the permanent public HTTPS URL (https://{name}.vibesdk.gloriatrials.com). The script must export default { async fetch(request, env, ctx) {} }. Use for: REST APIs, GraphQL, WebSocket servers, full-stack apps (API + embedded frontend). CRITICAL: when embedding HTML inside the script string, use single-quoted string concatenation (never template literals with backticks) to avoid JS syntax errors caused by backticks in HTML attributes or CSS.
 
 [GIT ARTIFACTS — currently unavailable, do not use these tools]
