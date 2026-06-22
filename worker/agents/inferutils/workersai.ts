@@ -276,7 +276,7 @@ export async function runExecutorBrain(
 		},
 	];
 
-	const stream = await runWorkersAiStream(env.AI, EXECUTOR_MODEL, messages, 512);
+	const stream = await runWorkersAiStream(env.AI, EXECUTOR_MODEL, messages, 4096);
 	const collectedActions: ActionEventData[] = [];
 	let lineBuffer = '';
 
