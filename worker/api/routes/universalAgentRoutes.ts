@@ -161,8 +161,10 @@ export function setupUniversalAgentRoutes(app: Hono<AppEnv>): void {
 			if (authResult) return authResult;
 
 			const sessionId = c.req.param('sessionId');
-			let filePath = c.req.param('*') || 'index.html';
-			if (!filePath || filePath === '/') filePath = 'index.html';
+			const previewMarker = '/preview/';
+			const previewMarkerIdx = c.req.path.indexOf(previewMarker);
+			let filePath = previewMarkerIdx >= 0 ? c.req.path.slice(previewMarkerIdx + previewMarker.length).replace(/^\/+/, '') : '';
+			if (!filePath) filePath = 'index.html';
 
 			const key = `sessions/${sessionId}/${filePath.replace(/^\/+/, '')}`;
 			const object = await c.env.SESSION_FILES_BUCKET.get(key);
