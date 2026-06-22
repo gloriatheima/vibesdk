@@ -1,6 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router';
-import { ArrowLeft, CheckCircle, XCircle, Loader, ChevronDown, ChevronRight, File, Rocket } from 'lucide-react';
+import {
+	ArrowLeft,
+	Check,
+	AlertTriangle,
+	Loader,
+	LoaderCircle,
+	ChevronDown,
+	ChevronRight,
+	Code,
+	Eye,
+	File,
+	Rocket,
+	TerminalSquare,
+	RefreshCw,
+} from 'lucide-react';
 import clsx from 'clsx';
 import type {
 	ThinkingEventData,
@@ -170,127 +184,53 @@ function clampText(text: string, max: number): string {
 	return text.length > max ? text.slice(0, max) + '…' : text;
 }
 
-function StatusBadge({ status, message }: { status: AgentStatus; message: string }) {
-	const map: Record<AgentStatus, { cls: string; spinner: boolean; check: boolean; cross: boolean }> = {
-		connecting: { cls: 'bg-text-primary/10 text-text-secondary', spinner: true, check: false, cross: false },
-		running:    { cls: 'bg-accent/10 text-accent',               spinner: true, check: false, cross: false },
-		done:       { cls: 'bg-green-500/10 text-green-500',         spinner: false, check: true,  cross: false },
-		error:      { cls: 'bg-red-500/10 text-red-500',             spinner: false, check: false, cross: true  },
-	};
-	const { cls, spinner, check, cross } = map[status];
-	return (
-		<span className={clsx('inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium', cls)}>
-			{spinner && <Loader className="size-3 animate-spin" />}
-			{check   && <CheckCircle className="size-3" />}
-			{cross   && <XCircle className="size-3" />}
-			{message}
-		</span>
-	);
-}
-
-function ThinkingBlock({ text }: { text: string }) {
-	return (
-		<div className="rounded-xl border border-border-primary/30 bg-bg-4 dark:bg-bg-2 px-4 py-3">
-			<div className="flex items-center gap-2 mb-2">
-				<Loader className="size-3 text-text-tertiary animate-spin" />
-				<span className="text-xs font-medium text-text-tertiary uppercase tracking-wider">Thinking</span>
-			</div>
-			<p className="text-xs font-mono text-text-secondary/70 italic leading-relaxed whitespace-pre-wrap break-words">
-				{clampText(text, 900)}
-			</p>
-		</div>
-	);
-}
-
-function PlanBlock({ plan }: { plan: PlanEventData }) {
-	return (
-		<div className="rounded-xl border border-accent/20 bg-bg-4 dark:bg-bg-2 px-4 py-3">
-			<div className="flex items-center gap-2 mb-2">
-				<div className="size-2 rounded-full bg-accent" />
-				<span className="text-xs font-medium text-text-secondary uppercase tracking-wider">Plan</span>
-				<span className="ml-auto text-xs text-text-tertiary">{plan.steps.length} steps</span>
-			</div>
-			<p className="text-sm text-text-primary mb-3 leading-snug">{plan.summary}</p>
-			<div className="space-y-1.5">
-				{plan.steps.map(step => (
-					<div key={step.index} className="flex items-start gap-2">
-						<span className="flex-shrink-0 text-xs text-text-tertiary font-mono w-4 leading-5">{step.index}.</span>
-						<code className="flex-shrink-0 text-xs text-accent font-mono leading-5">{step.tool}</code>
-						<span className="text-xs text-text-secondary leading-5 truncate">{step.description}</span>
-					</div>
-				))}
-			</div>
-		</div>
-	);
-}
-
-function ReflectBlock({ reflection }: { reflection: ReflectEventData }) {
-	return (
-		<div className={clsx(
-			'rounded-xl border px-4 py-3',
-			reflection.isDone
-				? 'border-green-500/20 bg-green-500/5'
-				: 'border-border-primary/30 bg-bg-4 dark:bg-bg-2',
-		)}>
-			<div className="flex items-center gap-2 mb-1.5">
-				<CheckCircle className={clsx('size-3', reflection.isDone ? 'text-green-500' : 'text-text-tertiary')} />
-				<span className="text-xs font-medium text-text-secondary uppercase tracking-wider">
-					Reflect · iteration {reflection.iteration + 1}
-				</span>
-				{reflection.isDone && <span className="ml-auto text-xs text-green-500 font-medium">Done</span>}
-			</div>
-			<p className="text-sm text-text-primary leading-snug">{reflection.summary}</p>
-		</div>
-	);
-}
-
-function ActionLogEntry({ entry }: { entry: ActionEntry }) {
+function ToolStatusEntry({ entry }: { entry: ActionEntry }) {
 	const [expanded, setExpanded] = useState(false);
 	const { action, result } = entry;
 	const pending = result === null;
+	const canExpand = !pending;
+	const statusText = pending ? 'Running' : result.success ? 'Completed' : 'Error';
+	const StatusIcon = pending ? LoaderCircle : result.success ? Check : AlertTriangle;
+	const iconCls = pending
+		? 'size-3 animate-spin text-text-tertiary'
+		: result.success
+			? 'size-3 text-green-500'
+			: 'size-3 text-red-400';
 
 	return (
-		<div className="rounded-lg border border-border-primary/30 overflow-hidden">
+		<div className="flex flex-col gap-1.5">
 			<button
 				type="button"
-				onClick={() => setExpanded(e => !e)}
-				className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-bg-3/30 transition-colors"
+				onClick={() => canExpand && setExpanded(e => !e)}
+				className={clsx(
+					'flex items-center gap-1.5 text-xs text-text-tertiary',
+					canExpand && 'cursor-pointer hover:text-text-secondary transition-colors',
+				)}
+				disabled={!canExpand}
 			>
-				{pending ? (
-					<Loader className="size-3.5 flex-shrink-0 text-accent animate-spin" />
-				) : result!.success ? (
-					<CheckCircle className="size-3.5 flex-shrink-0 text-green-500" />
-				) : (
-					<XCircle className="size-3.5 flex-shrink-0 text-red-500" />
-				)}
-				<span className="text-xs text-text-tertiary font-mono flex-shrink-0">Step {action.step}</span>
-				<code className="text-xs font-mono text-accent flex-shrink-0">{action.tool}</code>
-				{!pending && !result!.success && (
-					<span className="text-xs text-red-400 truncate flex-1">failed</span>
-				)}
-				<span className="ml-auto flex-shrink-0">
-					{expanded
-						? <ChevronDown className="size-3 text-text-tertiary" />
-						: <ChevronRight className="size-3 text-text-tertiary" />}
+				<StatusIcon className={iconCls} />
+				<span className="font-mono tracking-tight">
+					{statusText} <span className="text-text-secondary">{action.tool}</span>
 				</span>
+				{canExpand && (
+					expanded
+						? <ChevronDown className="size-3 ml-0.5" />
+						: <ChevronRight className="size-3 ml-0.5" />
+				)}
 			</button>
-
 			{expanded && (
-				<div className="border-t border-border-primary/30 px-3 py-2.5 bg-bg-1/50 space-y-2.5">
+				<div className="ml-4 p-2.5 rounded-md text-xs font-mono border border-border-primary/30 bg-bg-1/50 overflow-auto max-h-64 space-y-2">
 					<div>
-						<p className="text-xs text-text-tertiary mb-1">params</p>
-						<pre className="text-xs font-mono text-text-secondary whitespace-pre-wrap break-all leading-relaxed">
+						<div className="text-[10px] uppercase tracking-wide text-text-tertiary mb-1">Input</div>
+						<pre className="text-text-secondary whitespace-pre-wrap break-all">
 							{JSON.stringify(action.params, null, 2)}
 						</pre>
 					</div>
-					{!pending && (
+					{result && (
 						<div>
-							<p className="text-xs text-text-tertiary mb-1">{result!.success ? 'output' : 'error'}</p>
-							<pre className={clsx(
-								'text-xs font-mono whitespace-pre-wrap break-all leading-relaxed',
-								result!.success ? 'text-text-secondary' : 'text-red-400',
-							)}>
-								{clampText(result!.output || result!.error || '', 800)}
+							<div className="text-[10px] uppercase tracking-wide text-text-tertiary mb-1">Output</div>
+							<pre className={clsx('whitespace-pre-wrap break-all', result.success ? 'text-text-secondary' : 'text-red-400')}>
+								{clampText(result.output || result.error || '', 800)}
 							</pre>
 						</div>
 					)}
@@ -306,26 +246,24 @@ export default function AgentPage() {
 	const navigate = useNavigate();
 	const instruction = (location.state as { instruction?: string } | null)?.instruction ?? '';
 
-	const leftRef  = useRef<HTMLDivElement>(null);
-	const rightRef = useRef<HTMLDivElement>(null);
+	const chatRef = useRef<HTMLDivElement>(null);
 
 	const { agentStatus, statusMessage, thinkingText, plan, actionLog, reflections, files, deployReady, error } =
 		useAgentStream(sessionId ?? '');
 
-	const [rightTab, setRightTab] = useState<'log' | 'files' | 'preview'>('log');
+	const [view, setView] = useState<'preview' | 'code'>('preview');
 	const [selectedFile, setSelectedFile] = useState<string | null>(null);
 	const [fileContent, setFileContent] = useState<string | null>(null);
 	const [loadingFile, setLoadingFile] = useState(false);
 	const [deploying, setDeploying] = useState(false);
+	const [previewKey, setPreviewKey] = useState(0);
 
 	const handleDeploy = async () => {
 		if (!sessionId || deploying) return;
 		setDeploying(true);
 		const result = await apiClient.deployAgentSession(sessionId, instruction);
 		setDeploying(false);
-		if (result.data?.appId) {
-			navigate(`/app/${result.data.appId}`);
-		}
+		if (result.data?.previewUrl) window.open(result.data.previewUrl, '_blank');
 	};
 
 	const handleFileClick = async (filePath: string) => {
@@ -333,6 +271,7 @@ export default function AgentPage() {
 		setSelectedFile(filePath);
 		setFileContent(null);
 		setLoadingFile(true);
+		setView('code');
 		const result = await apiClient.getSessionFileContent(sessionId, filePath);
 		setFileContent(result.data?.content ?? '// Error loading file');
 		setLoadingFile(false);
@@ -340,28 +279,28 @@ export default function AgentPage() {
 
 	const htmlFile = files.find(f => f.path.endsWith('.html'));
 	const previewEntryPath = htmlFile?.path.replace(/^\/+/, '') ?? 'index.html';
-	const lastOutput = actionLog.slice().reverse().find(e => e.result?.success && e.action.tool === 'sandbox_run')?.result?.output;
+	const sandboxEntries = actionLog.filter(e =>
+		['sandbox_write', 'sandbox_run', 'shell_exec', 'sandbox_read'].includes(e.action.tool),
+	);
+	const hasSandboxResult = sandboxEntries.some(e => e.result !== null);
+	const isRunning = agentStatus === 'connecting' || agentStatus === 'running';
 
 	useEffect(() => {
-		if (htmlFile && rightTab === 'log') setRightTab('preview');
-	}, [htmlFile?.path]);
+		if ((htmlFile || hasSandboxResult) && view !== 'preview') setView('preview');
+	}, [!!htmlFile, hasSandboxResult]);
 
 	useEffect(() => {
-		leftRef.current?.scrollTo({ top: leftRef.current.scrollHeight, behavior: 'smooth' });
-	}, [thinkingText, plan, reflections.length]);
-
-	useEffect(() => {
-		rightRef.current?.scrollTo({ top: rightRef.current.scrollHeight, behavior: 'smooth' });
-	}, [actionLog.length]);
+		chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight, behavior: 'smooth' });
+	}, [actionLog.length, reflections.length, thinkingText]);
 
 	if (!sessionId) {
 		return <div className="p-8 text-text-secondary text-sm">Invalid session.</div>;
 	}
 
 	return (
-		<div className="flex flex-col h-full overflow-hidden bg-bg-1 dark:bg-bg-1">
+		<div className="size-full flex flex-col min-h-0 text-text-primary bg-bg-1">
 			{/* Header */}
-			<div className="flex-shrink-0 flex items-center gap-3 px-4 py-3 border-b border-border-primary bg-bg-4 dark:bg-bg-2">
+			<div className="flex-shrink-0 flex items-center gap-3 px-4 py-2.5 border-b border-border-primary bg-bg-2">
 				<button
 					type="button"
 					onClick={() => navigate('/')}
@@ -371,11 +310,10 @@ export default function AgentPage() {
 					<ArrowLeft className="size-4" />
 				</button>
 				<div className="flex-1 min-w-0">
-					<p className="text-xs text-text-tertiary leading-none mb-0.5">Universal Agent</p>
 					{instruction ? (
-						<p className="text-sm font-medium text-text-primary truncate leading-tight">{instruction}</p>
+						<p className="text-sm font-medium text-text-primary truncate">{instruction}</p>
 					) : (
-						<p className="text-sm text-text-tertiary leading-tight">Session {sessionId.slice(0, 8)}…</p>
+						<p className="text-sm text-text-tertiary">Session {sessionId.slice(0, 8)}…</p>
 					)}
 				</div>
 				{deployReady && (
@@ -385,95 +323,223 @@ export default function AgentPage() {
 						disabled={deploying}
 						className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-medium hover:bg-accent/90 disabled:opacity-50 transition-colors"
 					>
-						{deploying ? (
-							<Loader className="size-3 animate-spin" />
-						) : (
-							<Rocket className="size-3" />
-						)}
-						{deploying ? 'Deploying…' : `Deploy as App (${deployReady.fileCount} files)`}
+						{deploying ? <Loader className="size-3 animate-spin" /> : <Rocket className="size-3" />}
+						{deploying ? 'Deploying…' : `Deploy (${deployReady.fileCount} files)`}
 					</button>
 				)}
-				<StatusBadge status={agentStatus} message={error ?? statusMessage} />
+				<span className={clsx(
+					'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium',
+					agentStatus === 'connecting' && 'bg-text-primary/10 text-text-secondary',
+					agentStatus === 'running' && 'bg-accent/10 text-accent',
+					agentStatus === 'done' && 'bg-green-500/10 text-green-500',
+					agentStatus === 'error' && 'bg-red-500/10 text-red-500',
+				)}>
+					{isRunning && <Loader className="size-3 animate-spin" />}
+					{agentStatus === 'done' && <Check className="size-3" />}
+					{agentStatus === 'error' && <AlertTriangle className="size-3" />}
+					{error ?? statusMessage}
+				</span>
 			</div>
 
-			{/* Split panels */}
-			<div className="flex-1 flex overflow-hidden min-h-0">
-				{/* Left: Brain activity */}
-				<div className="w-2/5 border-r border-border-primary flex flex-col overflow-hidden">
-					<div className="flex-shrink-0 px-4 py-2 border-b border-border-primary/50 bg-bg-4/50 dark:bg-bg-2/50">
-						<span className="text-xs font-medium text-text-tertiary uppercase tracking-wider">Brain Activity</span>
+			{/* Main */}
+			<div className="flex-1 flex min-h-0 overflow-hidden justify-center">
+				{/* Left: chat panel */}
+				<div
+					ref={chatRef}
+					className="w-80 flex-shrink-0 flex flex-col overflow-y-auto border-r border-border-primary pt-5 px-4 pb-6 gap-5 text-sm"
+				>
+					{/* User message */}
+					<div className="flex gap-3">
+						<div className="pl-0.5 flex-shrink-0">
+							<div className="size-6 flex items-center justify-center rounded-full bg-accent text-white">
+								<span className="text-xs font-medium">U</span>
+							</div>
+						</div>
+						<div className="flex flex-col gap-1 min-w-0">
+							<div className="font-medium text-text-primary">You</div>
+							<p className="text-text-primary/80 leading-relaxed break-words">
+								{instruction || `Session ${sessionId.slice(0, 8)}`}
+							</p>
+						</div>
 					</div>
-					<div ref={leftRef} className="flex-1 overflow-y-auto p-4 space-y-3">
-						{agentStatus === 'connecting' && (
-							<div className="flex items-center gap-2 text-text-tertiary pt-2">
-								<Loader className="size-4 animate-spin" />
-								<span className="text-sm">Connecting to agent session…</span>
-							</div>
-						)}
 
-						{thinkingText && <ThinkingBlock text={thinkingText} />}
-						{plan && <PlanBlock plan={plan} />}
-						{reflections.map((r, i) => (
-							<ReflectBlock key={i} reflection={r} />
-						))}
-
-						{agentStatus === 'done' && (
-							<div className="rounded-xl border border-green-500/30 bg-green-500/5 px-4 py-4 text-center">
-								<CheckCircle className="size-5 text-green-500 mx-auto mb-1.5" />
-								<p className="text-sm font-medium text-green-500">Task Complete</p>
-							</div>
-						)}
-						{agentStatus === 'error' && (
-							<div className="rounded-xl border border-red-500/30 bg-red-500/5 px-4 py-3">
-								<div className="flex items-center gap-2 mb-1">
-									<XCircle className="size-4 text-red-500" />
-									<span className="text-xs font-medium text-red-400 uppercase tracking-wider">Error</span>
+					{/* Agent message */}
+					{(actionLog.length > 0 || isRunning || reflections.length > 0) && (
+						<div className="flex gap-3">
+							<div className="pl-0.5 flex-shrink-0">
+								<div className="size-6 flex items-center justify-center rounded-full bg-[#f6821f]/10 border border-[#f6821f]/30">
+									<span className="text-xs font-semibold text-[#f6821f]">O</span>
 								</div>
-								<p className="text-sm text-red-400">{error}</p>
 							</div>
-						)}
-					</div>
+							<div className="flex flex-col gap-2 min-w-0 flex-1">
+								<div className="font-medium text-text-primary">Agent</div>
+								{plan && (
+									<p className="text-xs text-text-secondary leading-relaxed">{plan.summary}</p>
+								)}
+								<div className="flex flex-col gap-2">
+									{actionLog.map((entry, i) => (
+										<ToolStatusEntry key={i} entry={entry} />
+									))}
+								</div>
+								{thinkingText && isRunning && (
+									<p className="text-xs text-text-tertiary italic font-mono leading-relaxed mt-1">
+										{clampText(thinkingText, 300)}
+									</p>
+								)}
+								{reflections.map((r, i) => (
+									<div key={i} className={clsx(
+										'text-xs mt-1',
+										r.isDone ? 'text-green-500 font-medium' : 'text-text-secondary',
+									)}>
+										{r.summary}
+									</div>
+								))}
+								{agentStatus === 'done' && (
+									<div className="flex items-center gap-1.5 text-xs text-green-500 font-medium mt-1">
+										<Check className="size-3" />
+										Task Complete
+									</div>
+								)}
+								{agentStatus === 'error' && (
+									<div className="flex items-center gap-1.5 text-xs text-red-400 font-medium mt-1">
+										<AlertTriangle className="size-3" />
+										{error}
+									</div>
+								)}
+							</div>
+						</div>
+					)}
 				</div>
 
-				{/* Right: tabbed (Log / Files / Preview) */}
-				<div className="flex-1 flex flex-col overflow-hidden">
-					{/* Tab bar */}
-					<div className="flex-shrink-0 flex items-center border-b border-border-primary/50 bg-bg-4/50 dark:bg-bg-2/50">
-						{(['log', 'files', 'preview'] as const).map(tab => (
-							<button
-								key={tab}
-								type="button"
-								onClick={() => setRightTab(tab)}
-								className={clsx(
-									'px-4 py-2 text-xs font-medium uppercase tracking-wider border-b-2 transition-colors',
-									rightTab === tab
-										? 'border-accent text-accent'
-										: 'border-transparent text-text-tertiary hover:text-text-primary',
-								)}
-							>
-								{tab === 'log' ? 'Execution Log' : tab === 'files' ? `Files (${files.length})` : 'Preview'}
-							</button>
-						))}
+				{/* Right: preview / code panel */}
+				<div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+					{/* Right header */}
+					<div className="flex-shrink-0 grid grid-cols-3 items-center px-3 py-2 border-b border-border-primary bg-bg-2">
+						<div className="flex items-center">
+							<div className="flex items-center gap-0.5 bg-bg-1 rounded-md p-0.5">
+								<button
+									type="button"
+									onClick={() => setView('preview')}
+									title="Preview"
+									className={clsx(
+										'p-1 rounded transition-colors',
+										view === 'preview'
+											? 'bg-bg-4 text-text-primary'
+											: 'text-text-50/70 hover:text-text-primary hover:bg-bg-3',
+									)}
+								>
+									<Eye className="size-4" />
+								</button>
+								<button
+									type="button"
+									onClick={() => setView('code')}
+									title="Code"
+									className={clsx(
+										'p-1 rounded transition-colors',
+										view === 'code'
+											? 'bg-bg-4 text-text-primary'
+											: 'text-text-50/70 hover:text-text-primary hover:bg-bg-3',
+									)}
+								>
+									<Code className="size-4" />
+								</button>
+							</div>
+						</div>
+						<div className="flex items-center justify-center">
+							{view === 'code' && selectedFile && (
+								<span className="text-sm font-mono text-text-secondary/70 truncate max-w-[200px]">{selectedFile}</span>
+							)}
+							{view === 'preview' && htmlFile && (
+								<span className="text-sm font-mono text-text-secondary/70 truncate max-w-[200px]">{previewEntryPath}</span>
+							)}
+						</div>
+						<div className="flex items-center justify-end gap-1.5">
+							{view === 'preview' && htmlFile && (
+								<button
+									type="button"
+									onClick={() => setPreviewKey(k => k + 1)}
+									title="Refresh preview"
+									className="p-1 hover:bg-bg-3 rounded transition-colors"
+								>
+									<RefreshCw className="size-4 text-text-primary/50" />
+								</button>
+							)}
+						</div>
 					</div>
 
-					{rightTab === 'log' && (
-						<div ref={rightRef} className="flex-1 overflow-y-auto p-4 space-y-2">
-							{actionLog.length === 0 ? (
-								<p className="text-sm text-text-tertiary italic pt-2">
-									{agentStatus === 'connecting' || agentStatus === 'running'
-										? 'Waiting for tool actions…'
-										: 'No actions executed.'}
-								</p>
+					{/* Preview view */}
+					{view === 'preview' && (
+						<div className="flex-1 flex flex-col overflow-hidden bg-[#1d1e1e]">
+							{htmlFile ? (
+								<iframe
+									key={`preview-${previewKey}-${previewEntryPath}`}
+									src={`/api/universal/sessions/${sessionId}/preview/${previewEntryPath}`}
+									className="flex-1 w-full border-0 bg-white"
+									title="Preview"
+									sandbox="allow-scripts allow-same-origin"
+								/>
+							) : sandboxEntries.length === 0 ? (
+								<div className="flex-1 flex flex-col items-center justify-center gap-3 text-gray-500">
+									<TerminalSquare className="size-8 text-gray-600" />
+									<p className="text-sm font-mono">
+										{isRunning ? 'Waiting for output…' : 'No output yet.'}
+									</p>
+								</div>
 							) : (
-								actionLog.map((entry, i) => <ActionLogEntry key={i} entry={entry} />)
+								<div className="flex-1 overflow-y-auto p-4 space-y-2 font-mono text-sm">
+									{sandboxEntries.map((entry, i) => {
+										const isSandboxRun = entry.action.tool === 'sandbox_run' || entry.action.tool === 'shell_exec';
+										const isWrite = entry.action.tool === 'sandbox_write';
+										const command = String(entry.action.params.command ?? '');
+										const writePath = String(entry.action.params.path ?? entry.action.params.filename ?? '');
+										const result = entry.result;
+										let prettyOutput = '';
+										if (result?.output) {
+											try { prettyOutput = JSON.stringify(JSON.parse(result.output), null, 2); }
+											catch { prettyOutput = result.output; }
+										}
+										return (
+											<div key={i} className="space-y-1">
+												{isSandboxRun && (
+													<div className="flex items-start gap-2">
+														<span className="text-[#f6821f] select-none flex-shrink-0">$</span>
+														<span className="text-[#f6821f] break-all">{command}</span>
+													</div>
+												)}
+												{isWrite && (
+													<div className="text-blue-400">
+														<span className="text-gray-500 select-none mr-2">write</span>
+														{writePath}
+													</div>
+												)}
+												{result === null && (
+													<div className="flex items-center gap-2 text-gray-500 pl-4">
+														<Loader className="size-3 animate-spin" />
+														<span>running…</span>
+													</div>
+												)}
+												{result?.success && prettyOutput && (
+													<pre className="text-green-400 whitespace-pre-wrap break-all leading-relaxed pl-4">
+														{prettyOutput}
+													</pre>
+												)}
+												{!result?.success && result?.error && (
+													<pre className="text-red-400 whitespace-pre-wrap break-all leading-relaxed pl-4">
+														{result.error}
+													</pre>
+												)}
+											</div>
+										);
+									})}
+								</div>
 							)}
 						</div>
 					)}
 
-					{rightTab === 'files' && (
+					{/* Code view */}
+					{view === 'code' && (
 						<div className="flex-1 flex overflow-hidden min-h-0">
-							{/* File tree */}
-							<div className="w-48 flex-shrink-0 border-r border-border-primary/30 overflow-y-auto p-1">
+							<div className="w-48 flex-shrink-0 border-r border-border-primary/30 overflow-y-auto p-1 bg-bg-1">
 								{files.length === 0 ? (
 									<p className="text-xs text-text-tertiary italic p-3">No files yet…</p>
 								) : (
@@ -481,7 +547,7 @@ export default function AgentPage() {
 										<button
 											key={file.path}
 											type="button"
-											onClick={() => handleFileClick(file.path)}
+											onClick={() => void handleFileClick(file.path)}
 											className={clsx(
 												'w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-xs text-left transition-colors',
 												selectedFile === file.path
@@ -495,10 +561,9 @@ export default function AgentPage() {
 									))
 								)}
 							</div>
-							{/* Code preview */}
-							<div className="flex-1 overflow-auto bg-bg-1 dark:bg-bg-1">
+							<div className="flex-1 overflow-auto bg-bg-1">
 								{!selectedFile ? (
-									<p className="text-xs text-text-tertiary italic p-4">Select a file to preview</p>
+									<p className="text-xs text-text-tertiary italic p-4">Select a file to view</p>
 								) : loadingFile ? (
 									<div className="flex items-center gap-2 p-4 text-text-tertiary">
 										<Loader className="size-3 animate-spin" />
@@ -510,35 +575,6 @@ export default function AgentPage() {
 									</pre>
 								)}
 							</div>
-						</div>
-					)}
-
-					{rightTab === 'preview' && (
-						<div className="flex-1 flex flex-col overflow-hidden">
-							{htmlFile ? (
-								<iframe
-									key={previewEntryPath}
-									src={`/api/universal/sessions/${sessionId}/preview/${previewEntryPath}`}
-									className="flex-1 w-full border-0 bg-white"
-									title="Preview"
-									sandbox="allow-scripts allow-same-origin"
-								/>
-							) : lastOutput ? (
-								<div className="flex-1 overflow-y-auto p-4">
-									<pre className="text-xs font-mono text-text-primary whitespace-pre-wrap break-words leading-relaxed">
-										{(() => {
-											try { return JSON.stringify(JSON.parse(lastOutput), null, 2); }
-											catch { return lastOutput; }
-										})()}
-									</pre>
-								</div>
-							) : (
-								<div className="flex-1 flex items-center justify-center">
-									<p className="text-sm text-text-tertiary italic">
-										{agentStatus === 'running' ? 'Waiting for output…' : 'No previewable output yet.'}
-									</p>
-								</div>
-							)}
 						</div>
 					)}
 				</div>
