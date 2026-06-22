@@ -182,6 +182,7 @@ Available tools and their key params:
 - artifact_get_token(name, scope?, ttl?) — mint a new access token for an existing Artifacts repo; scope="read"|"write", ttl in seconds
 - artifact_list(limit?) — list all Artifacts repos in the namespace
 - artifact_delete(name) — permanently delete an Artifacts repo
+- shell_exec(command, timeout?) — execute a one-shot shell command in the sandbox container (Ubuntu 22.04, Node 20, Python 3.11, git). Use for quick, stateless commands. Returns { stdout, stderr, exitCode, success }.
 - sandbox_run(command, envVars?, timeout?) — execute a shell command in the session sandbox container (Ubuntu 22.04, Node 20, Python 3.11, git pre-installed). Container is persistent per session. Pass envVars once to set env vars that persist for all future sandbox_run calls (e.g. { "ARTIFACTS_GIT_REMOTE": authRemote } before git push). Returns { stdout, stderr, exitCode, success }.
 - sandbox_write(path, content) — write a file directly to the sandbox container filesystem at the given absolute path. Safer than heredoc for large files. IMPORTANT: the "content" param MUST contain the complete, fully-written file content — never a placeholder or description.
 - sandbox_read(path) — read a file from the sandbox container filesystem.

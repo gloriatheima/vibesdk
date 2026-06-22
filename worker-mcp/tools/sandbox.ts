@@ -7,6 +7,27 @@ import { str, truncate } from '../utils';
 
 export const TOOL_DEFINITIONS: McpTool[] = [
 	{
+		name: 'shell_exec',
+		description:
+			'Execute a one-shot shell command in the agent sandbox container (Ubuntu 22.04, Node 20, Python 3.11, git). ' +
+			'Use for quick commands where session persistence is not required. ' +
+			'Returns { stdout, stderr, exitCode, success }.',
+		inputSchema: {
+			type: 'object',
+			properties: {
+				command: {
+					type: 'string',
+					description: 'Shell command to execute.',
+				},
+				timeout: {
+					type: 'number',
+					description: 'Max seconds to wait for the command (default: 60)',
+				},
+			},
+			required: ['command'],
+		},
+	},
+	{
 		name: 'sandbox_run',
 		description:
 			'Execute a shell command in the agent sandbox container (Ubuntu 22.04, Node 20, Python 3.11, git). ' +
@@ -109,6 +130,8 @@ export async function executeTool(
 	const sandbox = getSandbox(ns, sandboxId);
 
 	switch (name) {
+		case 'shell_exec':
+			return runExec({ timeout: 60, ...args }, sandbox);
 		case 'sandbox_run':
 			return runExec(args, sandbox);
 		case 'sandbox_write':
