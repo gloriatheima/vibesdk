@@ -280,7 +280,7 @@ export default function AgentPage() {
 	const htmlFile = files.find(f => f.path.endsWith('.html'));
 	const previewEntryPath = htmlFile?.path.replace(/^\/+/, '') ?? 'index.html';
 	const sandboxEntries = actionLog.filter(e =>
-		['sandbox_write', 'sandbox_run', 'shell_exec', 'sandbox_read'].includes(e.action.tool),
+		['sandbox_write', 'sandbox_run', 'shell_exec', 'sandbox_read', 'direct_response'].includes(e.action.tool),
 	);
 	const hasSandboxResult = sandboxEntries.some(e => e.result !== null);
 	const isRunning = agentStatus === 'connecting' || agentStatus === 'running';
@@ -493,18 +493,34 @@ export default function AgentPage() {
 							) : (
 								<div className="flex-1 overflow-y-auto p-4 space-y-2 font-mono text-sm">
 									{sandboxEntries.map((entry, i) => {
-										const isSandboxRun = entry.action.tool === 'sandbox_run' || entry.action.tool === 'shell_exec';
-										const isWrite = entry.action.tool === 'sandbox_write';
+										const tool = entry.action.tool;
+										const isDirectResponse = tool === 'direct_response';
+										const isSandboxRun = tool === 'sandbox_run' || tool === 'shell_exec';
+										const isWrite = tool === 'sandbox_write';
 										const command = String(entry.action.params.command ?? '');
 										const writePath = String(entry.action.params.path ?? entry.action.params.filename ?? '');
 										const result = entry.result;
-										let prettyOutput = '';
+										let stdout = '';
+										let stderr = '';
+										let exitCode: number | null = null;
 										if (result?.output) {
-											try { prettyOutput = JSON.stringify(JSON.parse(result.output), null, 2); }
-											catch { prettyOutput = result.output; }
+											try {
+												const parsed = JSON.parse(result.output) as Record<string, unknown>;
+												stdout = String(parsed.stdout ?? '');
+												stderr = String(parsed.stderr ?? '');
+												exitCode = typeof parsed.exitCode === 'number' ? parsed.exitCode : null;
+											} catch {
+												stdout = result.output;
+											}
 										}
+										const commandFailed = exitCode !== null && exitCode !== 0;
 										return (
 											<div key={i} className="space-y-1">
+												{isDirectResponse && (
+													<div className="text-white/90 whitespace-pre-wrap break-words leading-relaxed border-l-2 border-gray-600 pl-3 py-0.5">
+														{String(entry.action.params.content ?? '')}
+													</div>
+												)}
 												{isSandboxRun && (
 													<div className="flex items-start gap-2">
 														<span className="text-[#f6821f] select-none flex-shrink-0">$</span>
@@ -517,21 +533,20 @@ export default function AgentPage() {
 														{writePath}
 													</div>
 												)}
-												{result === null && (
+												{result === null && !isDirectResponse && (
 													<div className="flex items-center gap-2 text-gray-500 pl-4">
 														<Loader className="size-3 animate-spin" />
 														<span>running…</span>
 													</div>
 												)}
-												{result?.success && prettyOutput && (
-													<pre className="text-green-400 whitespace-pre-wrap break-all leading-relaxed pl-4">
-														{prettyOutput}
-													</pre>
+												{stdout && !commandFailed && (
+													<pre className="text-green-400 whitespace-pre-wrap break-all leading-relaxed pl-4">{stdout}</pre>
+												)}
+												{stderr && (
+													<pre className="text-red-400 whitespace-pre-wrap break-all leading-relaxed pl-4">{stderr}</pre>
 												)}
 												{!result?.success && result?.error && (
-													<pre className="text-red-400 whitespace-pre-wrap break-all leading-relaxed pl-4">
-														{result.error}
-													</pre>
+													<pre className="text-red-400 whitespace-pre-wrap break-all leading-relaxed pl-4">{result.error}</pre>
 												)}
 											</div>
 										);
