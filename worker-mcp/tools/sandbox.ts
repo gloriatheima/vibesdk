@@ -123,7 +123,7 @@ export async function warmupSandbox(env: ToolServerEnv, sessionId: string): Prom
 			? (env.PersistentSandbox as unknown as DurableObjectNamespace<SandboxDO>)
 			: env.Sandbox;
 		const sandbox = getSandbox(ns, sandboxId);
-		await sandbox.exec('echo warmup', { timeout: 30 });
+		await withContainerRetry(() => sandbox.exec('echo warmup', { timeout: 10 }));
 	} catch {
 		// non-fatal — warmup failure is silent; the real call will handle it
 	}
@@ -161,7 +161,7 @@ export async function executeTool(
 type SandboxInstance = ReturnType<typeof getSandbox>;
 
 const CONTAINER_ERROR_PATTERNS = ['Unknown Error', 'container not ready', 'provisioning'];
-const RETRY_DELAYS_MS = [5_000, 10_000, 20_000];
+const RETRY_DELAYS_MS = [8_000, 15_000, 25_000];
 
 function isContainerError(err: unknown): boolean {
 	if (!(err instanceof Error)) return false;
