@@ -13,6 +13,7 @@ import {
 	Rocket,
 	TerminalSquare,
 	RefreshCw,
+	Activity,
 } from 'lucide-react';
 import clsx from 'clsx';
 import type {
@@ -48,6 +49,29 @@ interface AgentState {
 	files: SessionFileEntry[];
 	deployReady: DeployReadyEventData | null;
 	error: string | null;
+	rawEvents: RawSseEvent[];
+}
+
+type RawSseEvent = { ts: number; type: string; summary: string };
+
+function summarizeSseEvent(type: string, data: unknown): string {
+	const d = data as Record<string, unknown>;
+	switch (type) {
+		case 'thinking': return String(d.content ?? '').slice(0, 80);
+		case 'status': return String(d.message ?? '');
+		case 'plan': {
+			const steps = Array.isArray(d.steps) ? d.steps.length : '?';
+			return `${steps} steps — ${String(d.summary ?? '').slice(0, 60)}`;
+		}
+		case 'action': return `${String(d.tool ?? '')}  step ${String(d.step ?? '')}`;
+		case 'result': return `step ${String(d.step ?? '')} ${d.success ? '✓ OK' : `✗ ${String(d.error ?? '').slice(0, 60)}`}`;
+		case 'reflect': return `isDone=${String(d.isDone ?? '')}  ${String(d.summary ?? '').slice(0, 60)}`;
+		case 'file': return `${String(d.path ?? '')} (${String(d.size ?? '')}B)`;
+		case 'deploy_ready': return `${String(d.fileCount ?? '')} files ready`;
+		case 'done': return 'Task complete';
+		case 'error': return String(d.message ?? '');
+		default: return JSON.stringify(data).slice(0, 80);
+	}
 }
 
 function applyEvent(state: AgentState, type: string, data: unknown): AgentState {
@@ -120,6 +144,7 @@ function useAgentStream(sessionId: string) {
 		files: [],
 		deployReady: null,
 		error: null,
+		rawEvents: [],
 	});
 
 	useEffect(() => {
@@ -179,7 +204,10 @@ function useAgentStream(sessionId: string) {
 						} catch {
 							continue;
 						}
-						setState(s => applyEvent(s, eventType, data));
+						setState(s => ({
+						...applyEvent(s, eventType, data),
+						rawEvents: [...s.rawEvents, { ts: Date.now(), type: eventType, summary: summarizeSseEvent(eventType, data) }],
+					}));
 					}
 				}
 			} catch (err) {
@@ -255,6 +283,48 @@ function ToolStatusEntry({ entry }: { entry: ActionEntry }) {
 	);
 }
 
+const EVENT_COLORS: Record<string, string> = {
+	thinking: 'text-gray-400',
+	status: 'text-gray-400',
+	plan: 'text-blue-400',
+	action: 'text-yellow-400',
+	result: 'text-green-400',
+	reflect: 'text-purple-400',
+	file: 'text-cyan-400',
+	deploy_ready: 'text-cyan-400',
+	done: 'text-green-400',
+	error: 'text-red-400',
+};
+
+function SseStreamPanel({ events, isRunning }: { events: RawSseEvent[]; isRunning: boolean }) {
+	const bottomRef = useRef<HTMLDivElement>(null);
+	useEffect(() => {
+		bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+	}, [events.length]);
+
+	return (
+		<div className="flex-1 overflow-y-auto font-mono text-xs bg-bg-1 p-3 space-y-0.5">
+			{events.length === 0 ? (
+				<p className="text-text-tertiary italic p-2">No events yet…</p>
+			) : (
+				events.map((ev, i) => {
+					const t = new Date(ev.ts);
+					const time = `${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}:${String(t.getSeconds()).padStart(2,'0')}.${String(t.getMilliseconds()).padStart(3,'0')}`;
+					return (
+						<div key={i} className="flex items-start gap-2 leading-relaxed">
+							<span className="text-text-tertiary flex-shrink-0">{time}</span>
+							<span className={clsx('flex-shrink-0 w-20 font-semibold', EVENT_COLORS[ev.type] ?? 'text-text-secondary')}>{ev.type}</span>
+							<span className="text-text-secondary break-all">{ev.summary}</span>
+						</div>
+					);
+				})
+			)}
+			{isRunning && <div className="flex items-center gap-1.5 text-text-tertiary pt-1"><Loader className="size-3 animate-spin" /><span>streaming…</span></div>}
+			<div ref={bottomRef} />
+		</div>
+	);
+}
+
 export default function AgentPage() {
 	const { sessionId } = useParams<{ sessionId: string }>();
 	const location = useLocation();
@@ -263,10 +333,10 @@ export default function AgentPage() {
 
 	const chatRef = useRef<HTMLDivElement>(null);
 
-	const { agentStatus, statusMessage, thinkingText, plan, actionLog, reflections, files, deployReady, error } =
+	const { agentStatus, statusMessage, thinkingText, plan, actionLog, reflections, files, deployReady, error, rawEvents } =
 		useAgentStream(sessionId ?? '');
 
-	const [view, setView] = useState<'preview' | 'code'>('preview');
+	const [view, setView] = useState<'preview' | 'code' | 'stream'>('preview');
 	const [selectedFile, setSelectedFile] = useState<string | null>(null);
 	const [deploying, setDeploying] = useState(false);
 	const [previewKey, setPreviewKey] = useState(0);
@@ -450,6 +520,19 @@ export default function AgentPage() {
 								>
 									<Code className="size-4" />
 								</button>
+								<button
+									type="button"
+									onClick={() => setView('stream')}
+									title="SSE Stream"
+									className={clsx(
+										'p-1 rounded transition-colors',
+										view === 'stream'
+											? 'bg-bg-4 text-text-primary'
+											: 'text-text-50/70 hover:text-text-primary hover:bg-bg-3',
+									)}
+								>
+									<Activity className="size-4" />
+								</button>
 							</div>
 						</div>
 						<div className="flex items-center justify-center">
@@ -561,6 +644,11 @@ export default function AgentPage() {
 					{/* Code view */}
 					{view === 'code' && (
 						<CodePanel sessionId={sessionId} files={files} onSelectedFileChange={setSelectedFile} />
+					)}
+
+					{/* SSE Stream view */}
+					{view === 'stream' && (
+						<SseStreamPanel events={rawEvents} isRunning={isRunning} />
 					)}
 				</div>
 			</div>
