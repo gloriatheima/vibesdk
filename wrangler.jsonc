@@ -188,10 +188,9 @@
 			"custom_domain": true,
 			"zone_id": "b39f7059428b35845f43027fd4de7871"
 		},
-		{
-			"pattern": "*.vibesdk.gloriatrials.com/*",
-			"zone_id": "b39f7059428b35845f43027fd4de7871"
-		}
+		// Wildcard route *.vibesdk.gloriatrials.com/* is registered at runtime via
+		// dispatch.ts ensureWildcardDns() on first worker_deploy call to avoid needing
+		// Zone:Workers Routes:Edit permission on the wrangler deploy token.
 	],
 	"vars": {
 		"TEMPLATES_REPOSITORY": "https://github.com/cloudflare/vibesdk-templates",
