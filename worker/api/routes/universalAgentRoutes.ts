@@ -81,7 +81,7 @@ export function setupUniversalAgentRoutes(app: Hono<AppEnv>): void {
 			if (authResult) return authResult;
 
 			const sessionId = c.req.param('sessionId');
-			const filePath = c.req.param('*');
+			const filePath = (c.req.param('*') ?? '').replace(/^\/+/, '');
 			if (!filePath) return c.json({ error: 'file path is required' }, 400);
 
 			const key = `sessions/${sessionId}/${filePath}`;

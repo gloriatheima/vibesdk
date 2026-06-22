@@ -1185,7 +1185,7 @@ class ApiClient {
 	}
 
 	async getSessionFileContent(sessionId: string, filePath: string): Promise<ApiResponse<SessionFileContentResponse>> {
-		return this.request<SessionFileContentResponse>(`/api/universal/sessions/${sessionId}/files/${filePath}`);
+		return this.request<SessionFileContentResponse>(`/api/universal/sessions/${sessionId}/files/${filePath.replace(/^\/+/, '')}`);
 	}
 
 	/**
