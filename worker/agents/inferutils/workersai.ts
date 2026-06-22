@@ -165,30 +165,46 @@ Blueprint format:
   "summary": "One-line description of what will be accomplished"
 }
 
-Available tools and their key params:
-- direct_response(content) — respond with text directly when the entire task can be completed by generating text alone (e.g. tell a joke, write a story, explain a concept, translate, answer a question, write a poem). No files, no code execution, no external services needed. NEVER use to ask the user for clarification.
-- http_fetch(url, method?, body?) — fetch any URL and return raw HTTP response
-- browser_navigate(url, format?) — navigate browser; format='content'(default)|'markdown'
-- browse(url) — navigate and return page as Markdown (preferred for reading web content)
-- browser_screenshot(url, width?, height?) — take a screenshot, returns base64 PNG data URL
-- email_send(to, subject, body, from?, html?) — send an outbound email via SEND_EMAIL binding. The body param must contain the actual text content to send, not template variables or references to other steps.
-- email_inbox(limit?, since_ms?) — list received emails for this session
-- email_read(id) — read full body of an inbox message by message_id
-- file_write(filename, content) — write content to in-memory file
-- file_read(filename) — read in-memory file
-- file_list() — list all in-memory files
-- call_worker(name, path, method?, body?, headers?) — call a Worker in the platform dispatch namespace (Workers for Platforms)
-- call_service(binding, path, method?, body?, headers?) — call a private internal service via Workers VPC binding
-- artifact_create(name, description?) — create a versioned git repo in Cloudflare Artifacts; returns { remote, writeToken, authRemote, readToken, defaultBranch }. Use authRemote inside a sandbox for git push. Give readToken to the user for git clone.
-- artifact_get_token(name, scope?, ttl?) — mint a new access token for an existing Artifacts repo; scope="read"|"write", ttl in seconds
-- artifact_list(limit?) — list all Artifacts repos in the namespace
-- artifact_delete(name) — permanently delete an Artifacts repo
-- shell_exec(command, timeout?) — execute a one-shot shell command in the sandbox container (Ubuntu 22.04, Node 20, Python 3.11, git). Use for quick, stateless commands. Returns { stdout, stderr, exitCode, success }.
-- sandbox_run(command, envVars?, timeout?) — execute a shell command in the session sandbox container (Ubuntu 22.04, Node 20, Python 3.11, git pre-installed). Container is persistent per session. Pass envVars once to set env vars that persist for all future sandbox_run calls (e.g. { "ARTIFACTS_GIT_REMOTE": authRemote } before git push). Returns { stdout, stderr, exitCode, success }.
-- sandbox_write(path, content) — write a file directly to the sandbox container filesystem at the given absolute path. Safer than heredoc for large files. IMPORTANT: the "content" param MUST contain the complete, fully-written file content — never a placeholder or description.
-- sandbox_read(path) — read a file from the sandbox container filesystem.
+Available tools — grouped by category. Choose the most appropriate tool based on what the task actually requires.
+
+[TEXT RESPONSE]
+- direct_response(content) — use when the ENTIRE task is answered by generating text alone (e.g. tell a joke, write a poem, explain a concept, translate text, answer a factual question). No files written, no code executed, no external services called. NEVER use to ask for clarification.
+
+[WEB & HTTP]
+- browse(url) — navigate to a URL and return the page as clean Markdown. Preferred for reading articles, docs, or any web page.
+- browser_navigate(url, format?) — like browse but with format control: 'content' (default) or 'markdown'. Use when browse is insufficient.
+- browser_screenshot(url, width?, height?) — take a screenshot of a URL, returns base64 PNG. Use when visual output is needed.
+- http_fetch(url, method?, body?) — make a raw HTTP request and return the full response. Use when you need POST/PUT/DELETE or need the raw response headers/status.
+
+[EMAIL]
+- email_send(to, subject, body, from?, html?) — send an email using the platform's built-in email service. This is the ONLY way to send emails — never use shell commands like mail, sendmail, or curl. The body must contain the actual text to send, not template variables.
+- email_inbox(limit?, since_ms?) — list received emails for this session.
+- email_read(id) — read the full body of an email by message_id.
+
+[SESSION FILE STORAGE — no sandbox required, instant]
+- file_write(filename, content) — write a file to persistent session storage (served via the preview URL and visible in the Code tab). Use for ALL output files the user should see or download: HTML pages, CSS, JavaScript, markdown reports, JSON data, config files, README files. This does NOT require a sandbox container. Prefer this over sandbox_write whenever the file does not need to be executed inside a sandbox_run step.
+- file_read(filename) — read a file previously written with file_write.
+- file_list() — list all files in session storage.
+
+[PLATFORM WORKERS & SERVICES]
+- call_worker(name, path, method?, body?, headers?) — invoke a Worker deployed in the platform dispatch namespace (Workers for Platforms).
+- call_service(binding, path, method?, body?, headers?) — call a private internal service via Workers VPC binding (e.g. internal databases, WordPress, ClickHouse).
+
+[GIT ARTIFACTS]
+- artifact_create(name, description?) — create a versioned git repo in Cloudflare Artifacts; returns { remote, writeToken, authRemote, readToken, defaultBranch }. Use authRemote inside sandbox for git push. Give readToken to the user for git clone.
+- artifact_get_token(name, scope?, ttl?) — mint a new access token for an existing repo; scope="read"|"write", ttl in seconds.
+- artifact_list(limit?) — list all Artifacts repos.
+- artifact_delete(name) — permanently delete a repo.
+
+[SANDBOX — requires container, has cold-start delay; only use when code must actually run]
+- shell_exec(command, timeout?) — run a single stateless command in the sandbox (Ubuntu 22.04, Node 20, Python 3.11, git). State does NOT persist between shell_exec calls. Use for quick one-off commands. Returns { stdout, stderr, exitCode, success }.
+- sandbox_run(command, envVars?, timeout?) — run a command in a PERSISTENT sandbox container where state carries over between calls (installed packages, env vars, cwd). Use for multi-step workflows: install deps → write code → run → inspect output. Pass envVars once to set variables that persist for future calls.
+- sandbox_write(path, content) — write a file to the sandbox container filesystem. Use ONLY when the file must be read or executed inside a sandbox_run or shell_exec call (e.g. Python scripts, shell scripts, Dockerfiles). For files the user should preview, use file_write instead. The content param MUST be the complete file — never a placeholder.
+- sandbox_read(path) — read a file from the sandbox container filesystem. Use to inspect files created by sandbox_run.
 
 IMPORTANT: Only use the tools listed above. Do NOT invent tool names or assume any other tools exist. If the result from a previous step already contains the answer, you do NOT need another tool step — the data can be read directly from the step result. When a step involves writing code, include the COMPLETE code in the params — never leave content empty or as a description.
+
+Copy all identifiers from the instruction EXACTLY as written — email addresses, URLs, usernames, phone numbers, file names, domain names. Never paraphrase, abbreviate, or alter them.
 
 Output nothing except the JSON blueprint after the thinking block. No markdown, no explanation.`;
 
