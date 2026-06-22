@@ -87,30 +87,6 @@ async function runCallWorker(args: Record<string, unknown>, env: ToolServerEnv):
 	return JSON.stringify({ status: resp.status, body: truncate(text) });
 }
 
-async function ensureWildcardDns(domain: string, apiToken: string, workerName: string): Promise<void> {
-	const apex = domain.split('.').slice(-2).join('.');
-	const zonesResp = await fetch(`https://api.cloudflare.com/client/v4/zones?name=${apex}`, {
-		headers: { Authorization: `Bearer ${apiToken}` },
-	});
-	if (!zonesResp.ok) return;
-	const zones = (await zonesResp.json()) as { result?: Array<{ id: string }> };
-	const zoneId = zones.result?.[0]?.id;
-	if (!zoneId) return;
-
-	// Create wildcard CNAME; silently ignore errors (e.g. record already exists)
-	await fetch(`https://api.cloudflare.com/client/v4/zones/${zoneId}/dns_records`, {
-		method: 'POST',
-		headers: { Authorization: `Bearer ${apiToken}`, 'content-type': 'application/json' },
-		body: JSON.stringify({ type: 'CNAME', name: `*.${domain}`, content: domain, proxied: true, ttl: 1 }),
-	});
-
-	// Register wildcard Worker route pointing to the main dispatch Worker
-	await fetch(`https://api.cloudflare.com/client/v4/zones/${zoneId}/workers/routes`, {
-		method: 'POST',
-		headers: { Authorization: `Bearer ${apiToken}`, 'content-type': 'application/json' },
-		body: JSON.stringify({ pattern: `*.${domain}/*`, script: workerName }),
-	});
-}
 
 async function runWorkerDeploy(args: Record<string, unknown>, env: ToolServerEnv): Promise<string> {
 	const workerName = str(args.name).toLowerCase().replace(/[^a-z0-9-]/g, '-');
@@ -147,10 +123,6 @@ async function runWorkerDeploy(args: Record<string, unknown>, env: ToolServerEnv
 
 	const domain = env.CUSTOM_DOMAIN ?? 'vibesdk.gloriatrials.com';
 	const url = `https://${workerName}.${domain}`;
-
-	// Best-effort: ensure wildcard DNS CNAME and Worker route exist so subdomains resolve immediately
-	const mainWorker = 'vibesdk-production';
-	await ensureWildcardDns(domain, env.CLOUDFLARE_API_TOKEN, mainWorker).catch(() => {});
 
 	return JSON.stringify({ name: workerName, url, status: 'deployed' });
 }
