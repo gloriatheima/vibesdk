@@ -554,7 +554,7 @@ export class AppService extends BaseService {
      * Get app details with stats
      */
     async getAppDetails(appId: string, userId?: string): Promise<EnhancedAppData | null> {
-        const readDb = this.getReadDb('fast');
+        const readDb = this.getReadDb('fresh');
         
         const appResult = await readDb
             .select({

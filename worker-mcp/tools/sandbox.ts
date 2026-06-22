@@ -183,7 +183,7 @@ async function runExec(args: Record<string, unknown>, sandbox: SandboxInstance):
 }
 
 async function runWrite(args: Record<string, unknown>, sandbox: SandboxInstance): Promise<string> {
-	const path = str(args.path);
+	const path = str(args.path ?? args.filename);
 	const content = str(args.content);
 	if (!path) throw new Error('sandbox_write requires path');
 
