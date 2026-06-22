@@ -312,7 +312,7 @@ export default function AgentPage() {
 	const { agentStatus, statusMessage, thinkingText, plan, actionLog, reflections, files, deployReady, error } =
 		useAgentStream(sessionId ?? '');
 
-	const [rightTab, setRightTab] = useState<'log' | 'files'>('log');
+	const [rightTab, setRightTab] = useState<'log' | 'files' | 'preview'>('log');
 	const [selectedFile, setSelectedFile] = useState<string | null>(null);
 	const [fileContent, setFileContent] = useState<string | null>(null);
 	const [loadingFile, setLoadingFile] = useState(false);
@@ -337,6 +337,14 @@ export default function AgentPage() {
 		setFileContent(result.data?.content ?? '// Error loading file');
 		setLoadingFile(false);
 	};
+
+	const htmlFile = files.find(f => f.path.endsWith('.html'));
+	const previewEntryPath = htmlFile?.path.replace(/^\/+/, '') ?? 'index.html';
+	const lastOutput = actionLog.slice().reverse().find(e => e.result?.success && e.action.tool === 'sandbox_run')?.result?.output;
+
+	useEffect(() => {
+		if (htmlFile && rightTab === 'log') setRightTab('preview');
+	}, [htmlFile?.path]);
 
 	useEffect(() => {
 		leftRef.current?.scrollTo({ top: leftRef.current.scrollHeight, behavior: 'smooth' });
@@ -427,11 +435,11 @@ export default function AgentPage() {
 					</div>
 				</div>
 
-				{/* Right: tabbed (Log / Files) */}
+				{/* Right: tabbed (Log / Files / Preview) */}
 				<div className="flex-1 flex flex-col overflow-hidden">
 					{/* Tab bar */}
 					<div className="flex-shrink-0 flex items-center border-b border-border-primary/50 bg-bg-4/50 dark:bg-bg-2/50">
-						{(['log', 'files'] as const).map(tab => (
+						{(['log', 'files', 'preview'] as const).map(tab => (
 							<button
 								key={tab}
 								type="button"
@@ -443,12 +451,12 @@ export default function AgentPage() {
 										: 'border-transparent text-text-tertiary hover:text-text-primary',
 								)}
 							>
-								{tab === 'log' ? 'Execution Log' : `Files (${files.length})`}
+								{tab === 'log' ? 'Execution Log' : tab === 'files' ? `Files (${files.length})` : 'Preview'}
 							</button>
 						))}
 					</div>
 
-					{rightTab === 'log' ? (
+					{rightTab === 'log' && (
 						<div ref={rightRef} className="flex-1 overflow-y-auto p-4 space-y-2">
 							{actionLog.length === 0 ? (
 								<p className="text-sm text-text-tertiary italic pt-2">
@@ -460,7 +468,9 @@ export default function AgentPage() {
 								actionLog.map((entry, i) => <ActionLogEntry key={i} entry={entry} />)
 							)}
 						</div>
-					) : (
+					)}
+
+					{rightTab === 'files' && (
 						<div className="flex-1 flex overflow-hidden min-h-0">
 							{/* File tree */}
 							<div className="w-48 flex-shrink-0 border-r border-border-primary/30 overflow-y-auto p-1">
@@ -500,6 +510,35 @@ export default function AgentPage() {
 									</pre>
 								)}
 							</div>
+						</div>
+					)}
+
+					{rightTab === 'preview' && (
+						<div className="flex-1 flex flex-col overflow-hidden">
+							{htmlFile ? (
+								<iframe
+									key={previewEntryPath}
+									src={`/api/universal/sessions/${sessionId}/preview/${previewEntryPath}`}
+									className="flex-1 w-full border-0 bg-white"
+									title="Preview"
+									sandbox="allow-scripts allow-same-origin"
+								/>
+							) : lastOutput ? (
+								<div className="flex-1 overflow-y-auto p-4">
+									<pre className="text-xs font-mono text-text-primary whitespace-pre-wrap break-words leading-relaxed">
+										{(() => {
+											try { return JSON.stringify(JSON.parse(lastOutput), null, 2); }
+											catch { return lastOutput; }
+										})()}
+									</pre>
+								</div>
+							) : (
+								<div className="flex-1 flex items-center justify-center">
+									<p className="text-sm text-text-tertiary italic">
+										{agentStatus === 'running' ? 'Waiting for output…' : 'No previewable output yet.'}
+									</p>
+								</div>
+							)}
 						</div>
 					)}
 				</div>

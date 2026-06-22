@@ -125,6 +125,49 @@ export function setupUniversalAgentRoutes(app: Hono<AppEnv>): void {
 		},
 	);
 
+	// Serve session files from R2 with correct MIME types for browser preview.
+	app.get(
+		'/api/universal/sessions/:sessionId/preview/*',
+		setAuthLevel(AuthConfig.authenticated),
+		async (c) => {
+			const authResult = await enforceAuthRequirement(c);
+			if (authResult) return authResult;
+
+			const sessionId = c.req.param('sessionId');
+			let filePath = c.req.param('*') || 'index.html';
+			if (!filePath || filePath === '/') filePath = 'index.html';
+
+			const key = `sessions/${sessionId}/${filePath.replace(/^\/+/, '')}`;
+			const object = await c.env.SESSION_FILES_BUCKET.get(key);
+			if (!object) return c.text('Not Found', 404);
+
+			const ext = filePath.split('.').pop()?.toLowerCase() ?? '';
+			const mimeMap: Record<string, string> = {
+				html: 'text/html; charset=utf-8',
+				css: 'text/css',
+				js: 'application/javascript',
+				mjs: 'application/javascript',
+				json: 'application/json',
+				svg: 'image/svg+xml',
+				png: 'image/png',
+				jpg: 'image/jpeg',
+				jpeg: 'image/jpeg',
+				ico: 'image/x-icon',
+				woff2: 'font/woff2',
+				woff: 'font/woff',
+			};
+			const contentType = mimeMap[ext] ?? 'text/plain; charset=utf-8';
+
+			const body = await object.arrayBuffer();
+			return new Response(body, {
+				headers: {
+					'Content-Type': contentType,
+					'Cache-Control': 'no-store',
+				},
+			});
+		},
+	);
+
 	// SSE stream: proxy from the UniversalAgentSession DO for a given session.
 	app.get(
 		'/api/universal/sessions/:sessionId/stream',

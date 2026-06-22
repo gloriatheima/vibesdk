@@ -188,6 +188,16 @@ export class UniversalAgentSession extends DurableObject<Env> {
 							data: { path: filename, size: content.length },
 						});
 					}
+					if (action.tool === 'sandbox_write' && result.success) {
+						const filePath = String(action.params.path ?? action.params.filename ?? '');
+						const content = String(action.params.content ?? '');
+						if (filePath && content) {
+							const r2Key = `sessions/${payload.sessionId}/${filePath.replace(/^\/+/, '')}`;
+							await this.env.SESSION_FILES_BUCKET.put(r2Key, content).catch(() => {});
+							writtenFiles.push(filePath);
+							await this.emit({ type: 'file', data: { path: filePath, size: content.length } });
+						}
+					}
 				}
 
 				history.push({ plan, results });
