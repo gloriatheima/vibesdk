@@ -233,11 +233,26 @@ export async function runPlannerBrain(
 	return parsePlanBlueprint(fullResponse, instruction);
 }
 
+const EMAIL_RE = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+
+function fixVerbatimIdentifiers(text: string, instruction: string): string {
+	const sourceEmails = instruction.match(EMAIL_RE) ?? [];
+	if (sourceEmails.length === 0) return text;
+	return text.replace(EMAIL_RE, (found) => {
+		const exact = sourceEmails.find(e => e.toLowerCase() === found.toLowerCase());
+		if (exact) return exact;
+		const foundDomain = found.split('@')[1]?.toLowerCase() ?? '';
+		const sameDomain = sourceEmails.find(e => e.split('@')[1]?.toLowerCase() === foundDomain);
+		return sameDomain ?? found;
+	});
+}
+
 function parsePlanBlueprint(raw: string, fallbackInstruction: string): PlanEventData {
 	const match = raw.match(/\{[\s\S]*\}/);
 	if (match) {
 		try {
-			const parsed = JSON.parse(match[0]) as Partial<PlanEventData>;
+			const fixed = fixVerbatimIdentifiers(match[0], fallbackInstruction);
+			const parsed = JSON.parse(fixed) as Partial<PlanEventData>;
 			if (Array.isArray(parsed.steps) && typeof parsed.summary === 'string') {
 				return parsed as PlanEventData;
 			}
@@ -400,7 +415,11 @@ export async function runReflectorBrain(
 
 	// deepseek-r1 emits <think>...</think> before the JSON — strip it.
 	const stripped = fullResponse.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
-	return parseReflectorResult(stripped);
+	const result = parseReflectorResult(stripped);
+	if (result.nextInstruction) {
+		result.nextInstruction = fixVerbatimIdentifiers(result.nextInstruction, instruction);
+	}
+	return result;
 }
 
 function parseReflectorResult(raw: string): ReflectorResult {

@@ -4,6 +4,7 @@ import { AuthConfig, setAuthLevel, enforceAuthRequirement } from '../../middlewa
 import { generateId } from '../../utils/idGenerator';
 import type { AgentTaskPayload } from '../../agents/universal/types';
 import type { UniversalAgentSession } from '../../agents/universal/UniversalAgentSession';
+import { successResponse } from '../responses';
 
 export function setupUniversalAgentRoutes(app: Hono<AppEnv>): void {
 	// ========================================
@@ -68,7 +69,7 @@ export function setupUniversalAgentRoutes(app: Hono<AppEnv>): void {
 				size: obj.size,
 				uploaded: obj.uploaded.toISOString(),
 			}));
-			return c.json({ files });
+			return c.json(successResponse({ files }));
 		},
 	);
 
@@ -91,7 +92,7 @@ export function setupUniversalAgentRoutes(app: Hono<AppEnv>): void {
 			if (!object) return c.json({ error: 'File not found' }, 404);
 
 			const content = await object.text();
-			return c.json({ path: filePath, content });
+			return c.json(successResponse({ path: filePath, content }));
 		},
 	);
 
