@@ -202,6 +202,25 @@ Available tools — grouped by category. Choose the most appropriate tool based 
 - sandbox_write(path, content) — write a file to the sandbox container filesystem. Use ONLY when the file must be read or executed inside a sandbox_run or shell_exec call (e.g. Python scripts, shell scripts, Dockerfiles). For files the user should preview, use file_write instead. The content param MUST be the complete file — never a placeholder.
 - sandbox_read(path) — read a file from the sandbox container filesystem. Use to inspect files created by sandbox_run.
 
+[PROJECT STRATEGY — apply when building any non-trivial app, website, or service]
+Think in terms of real software projects. Do not generate boilerplate from scratch. Instead:
+1. SCAFFOLD: Use sandbox_run with the right generator for the stack:
+   - React/Vue/Svelte SPA → npx create-vite@latest my-app -- --template react-ts (or vue-ts, svelte-ts)
+   - Next.js → npx create-next-app@latest my-app --typescript --tailwind --app
+   - Express API → npx express-generator my-api && cd my-api && npm install
+   - Python FastAPI → pip install fastapi uvicorn && sandbox_write main.py
+   - Python Flask → pip install flask && sandbox_write app.py
+   - Static site with no build step → skip scaffolding, use file_write directly
+2. CUSTOMIZE: Use sandbox_write to write only the files that differ from the scaffold (components, routes, business logic, styles). Never rewrite package.json or config files the generator already created correctly.
+3. INSTALL DEPS: sandbox_run "cd my-app && npm install <extra-packages>" for any libraries beyond the scaffold defaults (e.g. react-router-dom, axios, zustand, tailwindcss, framer-motion).
+4. BUILD: sandbox_run the build command (npm run build, vite build, python -m pytest, etc.).
+5. EXPORT to preview: After building, copy dist output to session file storage so the user can see it:
+   - Vite/CRA: sandbox_run "find my-app/dist -type f" to enumerate, then file_write each file with its content read via sandbox_read.
+   - Python/Node services that must stay running: use direct_response to give the user the run command — they cannot be served as static previews.
+6. GIT (optional): For deliverable source code, use artifact_create then push with sandbox_run git commands.
+
+Do NOT hand-write React/Vue boilerplate (main.tsx, vite.config.ts, tsconfig.json, index.html) — the scaffolder creates these correctly. Only write the application-specific code the user asked for.
+
 IMPORTANT: Only use the tools listed above. Do NOT invent tool names or assume any other tools exist. If the result from a previous step already contains the answer, you do NOT need another tool step — the data can be read directly from the step result. When a step involves writing code, include the COMPLETE code in the params — never leave content empty or as a description.
 
 Copy all identifiers from the instruction EXACTLY as written — email addresses, URLs, usernames, phone numbers, file names, domain names. Never paraphrase, abbreviate, or alter them.
@@ -307,7 +326,7 @@ export async function runExecutorBrain(
 		},
 	];
 
-	const stream = await runWorkersAiStream(env.AI, EXECUTOR_MODEL, messages, 4096);
+	const stream = await runWorkersAiStream(env.AI, EXECUTOR_MODEL, messages, 8192);
 	const collectedActions: ActionEventData[] = [];
 	let lineBuffer = '';
 
