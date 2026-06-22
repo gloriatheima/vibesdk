@@ -358,13 +358,14 @@ export default function AgentPage() {
 	const isRunning = agentStatus === 'connecting' || agentStatus === 'running';
 
 	const hasHtmlFile = !!htmlFile;
+	const doneReflect = [...reflections].reverse().find((r: ReflectEventData) => r.isDone) ?? null;
 	const autoSwitched = useRef(false);
 	useEffect(() => {
-		if ((hasHtmlFile || hasSandboxResult) && !autoSwitched.current) {
+		if ((hasHtmlFile || hasSandboxResult || doneReflect) && !autoSwitched.current) {
 			autoSwitched.current = true;
 			setView('preview');
 		}
-	}, [hasHtmlFile, hasSandboxResult]);
+	}, [hasHtmlFile, hasSandboxResult, doneReflect]);
 
 	useEffect(() => {
 		chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight, behavior: 'smooth' });
@@ -568,7 +569,13 @@ export default function AgentPage() {
 									title="Preview"
 									sandbox="allow-scripts allow-same-origin"
 								/>
-							) : sandboxEntries.length === 0 ? (
+							) : sandboxEntries.length === 0 && doneReflect ? (
+						<div className="flex-1 overflow-y-auto p-6">
+							<div className="max-w-2xl mx-auto text-sm text-text-primary/90 leading-relaxed whitespace-pre-wrap break-words">
+								{doneReflect.summary}
+							</div>
+						</div>
+					) : sandboxEntries.length === 0 ? (
 								<div className="flex-1 flex flex-col items-center justify-center gap-3 text-gray-500">
 									<TerminalSquare className="size-8 text-gray-600" />
 									<p className="text-sm font-mono">
