@@ -273,7 +273,7 @@ export async function runPlannerBrain(
 
 const EMAIL_RE = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
 
-function fixVerbatimIdentifiers(text: string, instruction: string): string {
+export function fixVerbatimIdentifiers(text: string, instruction: string): string {
 	const sourceEmails = instruction.match(EMAIL_RE) ?? [];
 	if (sourceEmails.length === 0) return text;
 	return text.replace(EMAIL_RE, (found) => {
@@ -286,7 +286,8 @@ function fixVerbatimIdentifiers(text: string, instruction: string): string {
 }
 
 function parsePlanBlueprint(raw: string, fallbackInstruction: string): PlanEventData {
-	const match = raw.match(/\{[\s\S]*\}/);
+	const withoutThink = raw.replace(/<think>[\s\S]*?<\/think>/g, '');
+	const match = withoutThink.match(/\{[\s\S]*\}/);
 	if (match) {
 		try {
 			const fixed = fixVerbatimIdentifiers(match[0], fallbackInstruction);
@@ -303,8 +304,8 @@ function parsePlanBlueprint(raw: string, fallbackInstruction: string): PlanEvent
 			{
 				index: 1,
 				description: fallbackInstruction.slice(0, 200),
-				tool: 'shell_exec',
-				params: {},
+				tool: 'direct_response',
+				params: { content: `Unable to generate a plan for: ${fallbackInstruction.slice(0, 200)}` },
 			},
 		],
 		summary: fallbackInstruction.slice(0, 100),

@@ -1,6 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import { createLogger } from '../../logger';
-import { runPlannerBrain, runExecutorBrain, runReflectorBrain } from '../inferutils/workersai';
+import { runPlannerBrain, runExecutorBrain, runReflectorBrain, fixVerbatimIdentifiers } from '../inferutils/workersai';
 import { ToolExecutor } from './tools/executor';
 import { MCPClient } from './mcp/client';
 import { getAgentStub } from '../index';
@@ -182,6 +182,10 @@ export class UniversalAgentSession extends DurableObject<Env> {
 
 				const results: ToolResultEventData[] = [];
 				for (const action of actions) {
+					try {
+						const fixedParams = JSON.parse(fixVerbatimIdentifiers(JSON.stringify(action.params), payload.instruction)) as Record<string, string | number | boolean>;
+						action.params = fixedParams;
+					} catch { /* non-JSON-serialisable params, skip */ }
 					const result = await mcpClient.run(action);
 					results.push(result);
 					await this.emit({ type: 'result', data: result });
