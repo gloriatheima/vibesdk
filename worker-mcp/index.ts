@@ -1,7 +1,7 @@
 import { getSandbox } from '@cloudflare/sandbox';
 import type { Sandbox as SandboxDO } from '@cloudflare/sandbox';
 import type { ToolServerEnv } from './env';
-import { handleMcpRequest } from './router';
+import { handleMcpRequest, handlePoolRelease } from './router';
 import type { SandboxPool as SandboxPoolType } from './pool';
 
 export { Sandbox } from '@cloudflare/sandbox';
@@ -22,6 +22,11 @@ export default {
 
 		if (request.method !== 'POST') {
 			return new Response('Method Not Allowed', { status: 405 });
+		}
+
+		const url = new URL(request.url);
+		if (url.pathname === '/pool/release') {
+			return handlePoolRelease(request, env);
 		}
 
 		return handleMcpRequest(request, env);

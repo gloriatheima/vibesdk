@@ -2,7 +2,7 @@ import { DurableObject } from 'cloudflare:workers';
 import type { ToolServerEnv } from './env';
 
 const POOL_SIZE = 5;
-const SLOT_TTL_MS = 30 * 60 * 1000;
+const SLOT_TTL_MS = 5 * 60 * 1000;
 
 interface SlotState {
 	sessionId: string | null;

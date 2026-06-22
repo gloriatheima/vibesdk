@@ -46,7 +46,7 @@
 		}
 	],
 	"triggers": {
-		"crons": ["*/5 * * * *"]
+		"crons": ["*/15 * * * *"]
 	},
 	"account_id": "fcaaec845fe02e091365a0103ea4b97f",
 	"main": "worker-mcp/index.ts",

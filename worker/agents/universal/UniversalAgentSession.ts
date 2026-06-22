@@ -233,6 +233,13 @@ export class UniversalAgentSession extends DurableObject<Env> {
 				await this.sseWriter.close().catch(() => {});
 				this.sseWriter = null;
 			}
+			await this.env.TOOL_SERVER.fetch(
+				new Request('https://tool-server.internal/pool/release', {
+					method: 'POST',
+					headers: { 'content-type': 'application/json' },
+					body: JSON.stringify({ sessionId: payload.sessionId }),
+				}),
+			).catch(() => {});
 		}
 	}
 
