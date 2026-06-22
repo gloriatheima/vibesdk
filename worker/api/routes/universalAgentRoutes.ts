@@ -69,7 +69,7 @@ export function setupUniversalAgentRoutes(app: Hono<AppEnv>): void {
 				size: obj.size,
 				uploaded: obj.uploaded.toISOString(),
 			}));
-			return c.json(successResponse({ files }));
+			return successResponse({ files });
 		},
 	);
 
@@ -92,7 +92,7 @@ export function setupUniversalAgentRoutes(app: Hono<AppEnv>): void {
 			if (!object) return c.json({ error: 'File not found' }, 404);
 
 			const content = await object.text();
-			return c.json(successResponse({ path: filePath, content }));
+			return successResponse({ path: filePath, content });
 		},
 	);
 
