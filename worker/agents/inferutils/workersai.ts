@@ -195,11 +195,8 @@ Available tools — grouped by category. Choose the most appropriate tool based 
 - call_service(binding, path, method?, body?, headers?) — call a private internal service via Workers VPC binding (e.g. internal databases, WordPress, ClickHouse).
 - worker_deploy(name, script) — deploy a Cloudflare Worker ES module to the platform dispatch namespace. Returns { name, url } where url is the permanent public HTTPS URL (https://{name}.vibesdk.gloriatrials.com). The script must export default { async fetch(request, env, ctx) {} }. Use for: REST APIs, GraphQL, WebSocket servers, full-stack apps (API + embedded frontend).
 
-[GIT ARTIFACTS]
-- artifact_create(name, description?) — create a versioned git repo in Cloudflare Artifacts; returns { remote, writeToken, authRemote, readToken, defaultBranch }. Use authRemote inside sandbox for git push. Give readToken to the user for git clone.
-- artifact_get_token(name, scope?, ttl?) — mint a new access token for an existing repo; scope="read"|"write", ttl in seconds.
-- artifact_list(limit?) — list all Artifacts repos.
-- artifact_delete(name) — permanently delete a repo.
+[GIT ARTIFACTS — currently unavailable, do not use these tools]
+- artifact_create, artifact_get_token, artifact_list, artifact_delete — NOT available in this environment. If the task requires saving source code, use file_write to save each file so the user can access them from the Code tab.
 
 [SANDBOX — requires container, has cold-start delay; only use when code must actually run]
 - shell_exec(command, timeout?) — run a single stateless command in the sandbox (Ubuntu 22.04, Node 20, Python 3.11, git). State does NOT persist between shell_exec calls. Use for quick one-off commands. Returns { stdout, stderr, exitCode, success }.
@@ -237,6 +234,8 @@ Do NOT hand-write React/Vue boilerplate (main.tsx, vite.config.ts, tsconfig.json
 Only use the tools listed above. When a step involves writing code or content, include the COMPLETE content in the params — never leave it empty or as a placeholder.
 
 NEVER plan a direct_response step whose content depends on data fetched by a prior tool step (browse, browser_*, http_fetch, sandbox_run). The Executor cannot know what those tools will return. Use file_write to save fetched data instead.
+
+For tasks that only require reading or extracting content from a URL (e.g. get titles, links, summaries), use browse as a SINGLE step with no subsequent steps. The Reflector will read the browse output and extract the answer directly. Do NOT add file_write or sandbox_run after browse just to 'format' results.
 
 Output nothing except the JSON blueprint after the thinking block. No markdown, no explanation.`;
 
@@ -353,12 +352,17 @@ export async function runExecutorBrain(
 		const trimmed = line.trim();
 		if (!trimmed.startsWith('{')) return;
 		try {
-			const action = JSON.parse(trimmed) as Partial<ActionEventData>;
+			const action = JSON.parse(trimmed) as Partial<ActionEventData> & Record<string, unknown>;
 			if (typeof action.step === 'number' && typeof action.tool === 'string') {
+				const params: Record<string, unknown> = { ...(action.params ?? {}) };
+				const knownKeys = new Set(['step', 'tool', 'params']);
+				for (const [k, v] of Object.entries(action)) {
+					if (!knownKeys.has(k)) params[k] = v;
+				}
 				const evt: ActionEventData = {
 					step: action.step,
 					tool: action.tool,
-					params: action.params ?? {},
+					params: params as ActionEventData['params'],
 				};
 				collectedActions.push(evt);
 				await callbacks.onAction(evt);
@@ -399,7 +403,7 @@ You receive the original instruction, a completed execution plan, and the tool r
 Evaluate whether the overall task is complete or if further steps are needed.
 
 Key rules:
-1. If a tool step returned data that directly answers the original instruction, mark isDone=true and include the answer in the summary. Do NOT ask for more steps just to format or re-read data that is already in the results — extract it yourself.
+1. If a tool step returned data that directly answers the original instruction, mark isDone=true and include the answer in the summary. Do NOT ask for more steps just to format or re-read data that is already in the results — extract it yourself. IMPORTANT: if browse or browser_content returned markdown or HTML content containing the requested information (e.g. article titles, links, prices), extract that information yourself and mark isDone=true immediately — do not require a separate file_write or sandbox_run step.
 2. If a step's output contains a non-zero exitCode, "command not found", "permission denied", HTTP error codes (4xx/5xx), "Invalid input", or other error signals, that step did NOT fulfill its intended goal — even if the tool call itself technically returned a result. Reason about whether the overall task was still achieved despite the failure.
 3. If the task was not fully accomplished due to step failures, set isDone=false and write a nextInstruction that proposes a different approach or a different tool from the available set that could accomplish the same goal.
 4. CRITICAL — detect fabricated results: If a data-fetching step (browse, browser_*, http_fetch, sandbox_run) FAILED, and a subsequent direct_response presents content that appears to contain the data that step was supposed to fetch (e.g. article titles, URLs, scraped content), that content is fabricated and not real. Set isDone=false and write a nextInstruction to retry using a different tool (e.g. browse or browser_content instead of browser_scrape).
