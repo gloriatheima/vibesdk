@@ -238,7 +238,11 @@ Do NOT hand-write React/Vue boilerplate (main.tsx, vite.config.ts, tsconfig.json
 
 IMPORTANT: Only use the tools listed above. Do NOT invent tool names or assume any other tools exist. If the result from a previous step already contains the answer, you do NOT need another tool step — the data can be read directly from the step result. When a step involves writing code, include the COMPLETE code in the params — never leave content empty or as a description.
 
-Copy all identifiers from the instruction EXACTLY as written — email addresses, URLs, usernames, phone numbers, file names, domain names. Never paraphrase, abbreviate, or alter them.
+HARD PROHIBITIONS:
+- NEVER use shell commands (mail, sendmail, curl, mutt) or Python smtplib/SMTP to send email. The ONLY permitted email tool is email_send. Any plan that includes shell_exec/sandbox_run for sending email is WRONG.
+- NEVER use npm, pip, or any package manager to send email. Use email_send directly.
+
+Copy all identifiers from the instruction EXACTLY as written — email addresses, URLs, usernames, phone numbers, file names, domain names. Never paraphrase, abbreviate, or alter them. CRITICAL: verify every digit in an email address before including it in the plan (e.g. caofang2013 is NOT caofang213).
 
 Output nothing except the JSON blueprint after the thinking block. No markdown, no explanation.`;
 
