@@ -10,7 +10,6 @@ import {
 	ChevronRight,
 	Code,
 	Eye,
-	File,
 	Rocket,
 	TerminalSquare,
 	RefreshCw,
@@ -30,6 +29,7 @@ import type {
 	SessionFileEntry,
 } from '@/api-types';
 import { apiClient } from '@/lib/api-client';
+import { CodePanel } from './CodePanel';
 
 interface ActionEntry {
 	action: ActionEventData;
@@ -253,8 +253,6 @@ export default function AgentPage() {
 
 	const [view, setView] = useState<'preview' | 'code'>('preview');
 	const [selectedFile, setSelectedFile] = useState<string | null>(null);
-	const [fileContent, setFileContent] = useState<string | null>(null);
-	const [loadingFile, setLoadingFile] = useState(false);
 	const [deploying, setDeploying] = useState(false);
 	const [previewKey, setPreviewKey] = useState(0);
 
@@ -264,17 +262,6 @@ export default function AgentPage() {
 		const result = await apiClient.deployAgentSession(sessionId, instruction);
 		setDeploying(false);
 		if (result.data?.previewUrl) window.open(result.data.previewUrl, '_blank');
-	};
-
-	const handleFileClick = async (filePath: string) => {
-		if (!sessionId) return;
-		setSelectedFile(filePath);
-		setFileContent(null);
-		setLoadingFile(true);
-		setView('code');
-		const result = await apiClient.getSessionFileContent(sessionId, filePath);
-		setFileContent(result.data?.content ?? '// Error loading file');
-		setLoadingFile(false);
 	};
 
 	const htmlFile = files.find(f => f.path.endsWith('.html'));
@@ -558,44 +545,7 @@ export default function AgentPage() {
 
 					{/* Code view */}
 					{view === 'code' && (
-						<div className="flex-1 flex overflow-hidden min-h-0">
-							<div className="w-48 flex-shrink-0 border-r border-border-primary/30 overflow-y-auto p-1 bg-bg-1">
-								{files.length === 0 ? (
-									<p className="text-xs text-text-tertiary italic p-3">No files yet…</p>
-								) : (
-									files.map(file => (
-										<button
-											key={file.path}
-											type="button"
-											onClick={() => void handleFileClick(file.path)}
-											className={clsx(
-												'w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-xs text-left transition-colors',
-												selectedFile === file.path
-													? 'bg-accent/10 text-accent'
-													: 'text-text-secondary hover:bg-bg-3/50 hover:text-text-primary',
-											)}
-										>
-											<File className="size-3 flex-shrink-0" />
-											<span className="truncate">{file.path}</span>
-										</button>
-									))
-								)}
-							</div>
-							<div className="flex-1 overflow-auto bg-bg-1">
-								{!selectedFile ? (
-									<p className="text-xs text-text-tertiary italic p-4">Select a file to view</p>
-								) : loadingFile ? (
-									<div className="flex items-center gap-2 p-4 text-text-tertiary">
-										<Loader className="size-3 animate-spin" />
-										<span className="text-xs">Loading…</span>
-									</div>
-								) : (
-									<pre className="p-4 text-xs font-mono text-text-primary whitespace-pre-wrap break-words leading-relaxed">
-										{fileContent ?? ''}
-									</pre>
-								)}
-							</div>
-						</div>
+						<CodePanel sessionId={sessionId} files={files} onSelectedFileChange={setSelectedFile} />
 					)}
 				</div>
 			</div>

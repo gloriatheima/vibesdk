@@ -61,6 +61,7 @@ import type{
 	DeploySessionResponse,
 	SessionFilesResponse,
 	SessionFileContentResponse,
+	UpdateSessionFileResponse,
 } from '@/api-types';
 import {
 	RateLimitExceededError,
@@ -1186,6 +1187,13 @@ class ApiClient {
 
 	async getSessionFileContent(sessionId: string, filePath: string): Promise<ApiResponse<SessionFileContentResponse>> {
 		return this.request<SessionFileContentResponse>(`/api/universal/sessions/${sessionId}/files/${filePath.replace(/^\/+/, '')}`);
+	}
+
+	async updateSessionFileContent(sessionId: string, filePath: string, content: string): Promise<ApiResponse<UpdateSessionFileResponse>> {
+		return this.request<UpdateSessionFileResponse>(`/api/universal/sessions/${sessionId}/files/${filePath.replace(/^\/+/, '')}`, {
+			method: 'PUT',
+			body: { content },
+		});
 	}
 
 	/**

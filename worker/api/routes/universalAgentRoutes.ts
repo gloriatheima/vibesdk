@@ -96,6 +96,30 @@ export function setupUniversalAgentRoutes(app: Hono<AppEnv>): void {
 		},
 	);
 
+	// Update content of a specific session file in R2.
+	app.put(
+		'/api/universal/sessions/:sessionId/files/*',
+		setAuthLevel(AuthConfig.authenticated),
+		async (c) => {
+			const authResult = await enforceAuthRequirement(c);
+			if (authResult) return authResult;
+
+			const sessionId = c.req.param('sessionId');
+			const marker = '/files/';
+			const markerIdx = c.req.path.indexOf(marker);
+			const filePath = markerIdx >= 0 ? c.req.path.slice(markerIdx + marker.length).replace(/^\/+/, '') : '';
+			if (!filePath) return c.json({ error: 'file path is required' }, 400);
+
+			const body = await c.req.json<{ content?: string }>();
+			const content = body.content ?? '';
+
+			const key = `sessions/${sessionId}/${filePath}`;
+			await c.env.SESSION_FILES_BUCKET.put(key, content);
+
+			return successResponse({ path: filePath, bytes: new TextEncoder().encode(content).length });
+		},
+	);
+
 	// Deploy session files as an App via CodeGeneratorAgent sandbox pipeline.
 	app.post(
 		'/api/universal/sessions/:sessionId/deploy',

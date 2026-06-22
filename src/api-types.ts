@@ -253,6 +253,11 @@ export interface SessionFileContentResponse {
 	content: string;
 }
 
+export interface UpdateSessionFileResponse {
+	path: string;
+	bytes: number;
+}
+
 // Match chat FileType interface
 export interface FileType {
 	filePath: string;
