@@ -160,6 +160,31 @@ export async function executeTool(
 
 type SandboxInstance = ReturnType<typeof getSandbox>;
 
+const CONTAINER_ERROR_PATTERNS = ['Unknown Error', 'container not ready', 'provisioning'];
+const RETRY_DELAYS_MS = [5_000, 10_000];
+
+function isContainerError(err: unknown): boolean {
+	if (!(err instanceof Error)) return false;
+	return CONTAINER_ERROR_PATTERNS.some(p => err.message.includes(p));
+}
+
+async function withContainerRetry<T>(fn: () => Promise<T>): Promise<T> {
+	let lastErr: unknown;
+	for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+		try {
+			return await fn();
+		} catch (err) {
+			lastErr = err;
+			if (isContainerError(err) && attempt < RETRY_DELAYS_MS.length) {
+				await new Promise(r => setTimeout(r, RETRY_DELAYS_MS[attempt]));
+				continue;
+			}
+			throw err;
+		}
+	}
+	throw lastErr;
+}
+
 async function runExec(args: Record<string, unknown>, sandbox: SandboxInstance): Promise<string> {
 	const command = str(args.command);
 	if (!command) throw new Error('sandbox_run requires command');
@@ -173,27 +198,13 @@ async function runExec(args: Record<string, unknown>, sandbox: SandboxInstance):
 		await sandbox.setEnvVars(args.envVars as Record<string, string>);
 	}
 
-	let result;
-	for (let attempt = 0; attempt <= 2; attempt++) {
-		try {
-			result = await sandbox.exec(command, { timeout });
-			break;
-		} catch (err) {
-			const is500 = err instanceof Error && err.message.includes('500');
-			if (is500 && attempt < 2) {
-				const waitMs = [10_000, 20_000][attempt];
-				await new Promise(resolve => setTimeout(resolve, waitMs));
-				continue;
-			}
-			throw err;
-		}
-	}
+	const result = await withContainerRetry(() => sandbox.exec(command, { timeout }));
 
 	return JSON.stringify({
-		stdout: truncate(result!.stdout, 10_000),
-		stderr: truncate(result!.stderr, 5_000),
-		exitCode: result!.exitCode,
-		success: result!.success,
+		stdout: truncate(result.stdout, 10_000),
+		stderr: truncate(result.stderr, 5_000),
+		exitCode: result.exitCode,
+		success: result.success,
 	});
 }
 
@@ -204,10 +215,10 @@ async function runWrite(args: Record<string, unknown>, sandbox: SandboxInstance)
 
 	const dir = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';
 	if (dir) {
-		await sandbox.exec(`mkdir -p "${dir}"`, { timeout: 30 });
+		await withContainerRetry(() => sandbox.exec(`mkdir -p "${dir}"`, { timeout: 30 }));
 	}
 
-	await sandbox.writeFile(path, content);
+	await withContainerRetry(() => sandbox.writeFile(path, content));
 
 	return JSON.stringify({ path, bytes: new TextEncoder().encode(content).length });
 }
@@ -216,7 +227,7 @@ async function runRead(args: Record<string, unknown>, sandbox: SandboxInstance):
 	const path = str(args.path);
 	if (!path) throw new Error('sandbox_read requires path');
 
-	const file = await sandbox.readFile(path);
+	const file = await withContainerRetry(() => sandbox.readFile(path));
 
 	return JSON.stringify({ path, content: truncate(file.content, 50_000) });
 }

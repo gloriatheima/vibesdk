@@ -22,6 +22,7 @@ import type {
 } from './types';
 
 const MAX_ITERATIONS = 3;
+const SANDBOX_TOOLS = new Set(['shell_exec', 'sandbox_run', 'sandbox_write', 'sandbox_read']);
 
 type SsePayload =
 	| { type: 'thinking'; data: ThinkingEventData }
@@ -159,6 +160,9 @@ export class UniversalAgentSession extends DurableObject<Env> {
 
 				await this.emit({ type: 'plan', data: plan });
 
+				const needsWarmup = plan.steps.some(s => SANDBOX_TOOLS.has(s.tool));
+				const warmupPromise = needsWarmup ? this.warmupSandbox(payload.sessionId) : Promise.resolve();
+
 				// ── Phase B: Execute (Executor brain outputs action JSON) ──────────
 				await this.emit({ type: 'status', data: { message: 'Executing plan...' } });
 
@@ -170,6 +174,8 @@ export class UniversalAgentSession extends DurableObject<Env> {
 						await this.emit({ type: 'text', data: { content: chunk } });
 					},
 				});
+
+				await warmupPromise;
 
 				// ── Phase C: Run tools ─────────────────────────────────────────────
 				await this.emit({ type: 'status', data: { message: 'Running tools...' } });
@@ -250,6 +256,20 @@ export class UniversalAgentSession extends DurableObject<Env> {
 					body: JSON.stringify({ sessionId: payload.sessionId }),
 				}),
 			).catch(() => {});
+		}
+	}
+
+	private async warmupSandbox(sessionId: string): Promise<void> {
+		try {
+			await this.env.TOOL_SERVER.fetch(
+				new Request('https://tool-server.internal/sandbox/warmup', {
+					method: 'POST',
+					headers: { 'content-type': 'application/json' },
+					body: JSON.stringify({ sessionId }),
+				}),
+			);
+		} catch {
+			// non-fatal — retry logic in sandbox tools will handle cold starts
 		}
 	}
 
