@@ -14,6 +14,8 @@ export interface ToolServerEnv {
 	PersistentSandbox: DurableObjectNamespace<PersistentSandbox>;
 	CLOUDFLARE_ACCOUNT_ID: string;
 	CLOUDFLARE_API_TOKEN: string;
+	CUSTOM_DOMAIN: string;
+	DISPATCH_NAMESPACE: string;
 	EMAIL_FROM: string;
 	EMAIL_DOMAIN: string;
 }

@@ -171,9 +171,10 @@ Available tools — grouped by category. Choose the most appropriate tool based 
 - direct_response(content) — use when the ENTIRE task is answered by generating text alone (e.g. tell a joke, write a poem, explain a concept, translate text, answer a factual question). No files written, no code executed, no external services called. NEVER use to ask for clarification.
 
 [WEB & HTTP]
-- browse(url) — navigate to a URL and return the page as clean Markdown. Preferred for reading articles, docs, or any web page.
-- browser_navigate(url, format?) — like browse but with format control: 'content' (default) or 'markdown'. Use when browse is insufficient.
-- browser_screenshot(url, width?, height?) — take a screenshot of a URL, returns base64 PNG. Use when visual output is needed.
+- browse(url) — navigate to a URL and return the page as clean Markdown. PREFERRED for reading articles, docs, or any static web page. Fast, no JS execution.
+- browser_navigate(url, format?) — like browse but with format control: 'content' (default) returns raw HTML; 'markdown' returns Markdown. Use when browse output is insufficient.
+- browser_screenshot(url, width?, height?) — take a screenshot of a URL, returns base64 PNG. Use when visual output or layout inspection is needed.
+- browser_scrape(url, selectors, wait_for?) — fully render the page (JavaScript executed) then extract structured data via CSS selectors. Use for: JavaScript-heavy SPAs, e-commerce product listings, dynamic tables, paginated data, any site that requires JS to show content. Returns matched elements with text and attributes. Chain with sandbox_run for data analysis/processing.
 - http_fetch(url, method?, body?) — make a raw HTTP request and return the full response. Use when you need POST/PUT/DELETE or need the raw response headers/status.
 
 [EMAIL]
@@ -187,8 +188,9 @@ Available tools — grouped by category. Choose the most appropriate tool based 
 - file_list() — list all files in session storage.
 
 [PLATFORM WORKERS & SERVICES]
-- call_worker(name, path, method?, body?, headers?) — invoke a Worker deployed in the platform dispatch namespace (Workers for Platforms).
+- call_worker(name, path, method?, body?, headers?) — invoke a Worker already deployed in the platform dispatch namespace. Returns { status, body }.
 - call_service(binding, path, method?, body?, headers?) — call a private internal service via Workers VPC binding (e.g. internal databases, WordPress, ClickHouse).
+- worker_deploy(name, script) — deploy a Cloudflare Worker ES module to the platform dispatch namespace. Returns { name, url } where url is the permanent public HTTPS URL (https://{name}.vibesdk.gloriatrials.com). The script must export default { async fetch(request, env, ctx) {} }. Use for: REST APIs, GraphQL, WebSocket servers, full-stack apps (API + embedded frontend).
 
 [GIT ARTIFACTS]
 - artifact_create(name, description?) — create a versioned git repo in Cloudflare Artifacts; returns { remote, writeToken, authRemote, readToken, defaultBranch }. Use authRemote inside sandbox for git push. Give readToken to the user for git clone.
@@ -203,6 +205,18 @@ Available tools — grouped by category. Choose the most appropriate tool based 
 - sandbox_read(path) — read a file from the sandbox container filesystem. Use to inspect files created by sandbox_run.
 
 [PROJECT STRATEGY — apply when building any non-trivial app, website, or service]
+
+EXECUTION ENVIRONMENT DECISION — choose before planning any project:
+- Pure static output (HTML/CSS/JS report, data file, document) → file_write only. No sandbox or worker needed.
+- Frontend SPA that needs a build step (React, Vue, Svelte, Next.js static export) → sandbox_run to scaffold+build, then file_write the dist output for preview.
+- Backend API / service that must stay running and be publicly accessible (REST, GraphQL, WebSocket) → worker_deploy. Write a Cloudflare Worker (Hono recommended). Gets a permanent URL instantly.
+- Full-stack app (frontend + backend together) → scaffold+build frontend in sandbox → write a single Hono Worker that handles /api/* AND serves the React/Vue dist as embedded strings → worker_deploy → one URL for everything. The frontend must use relative /api/ paths so same-origin routing works.
+- Simple scraping / reading a web page → browse or browser_navigate. No sandbox needed.
+- Structured scraping from JS-heavy sites (SPAs, dynamic content, product listings) → browser_scrape with CSS selectors. No sandbox needed. Use file_write to save results.
+- Complex multi-page scraping + data processing / analysis → browser_scrape for each page, then sandbox_run (Python pandas/numpy/etc.) to process, then file_write the report.
+- Pure computation / data processing / testing (no web) → sandbox_run, return result via direct_response or file_write.
+- Long-running Python/Node server (Flask, FastAPI, Express) → convert to a Cloudflare Worker equivalent (Hono for Node, or use Python Workers if needed) and worker_deploy. Do NOT try to keep sandbox processes alive — they terminate after the step.
+
 Think in terms of real software projects. Do not generate boilerplate from scratch. Instead:
 1. SCAFFOLD: Use sandbox_run with the right generator for the stack:
    - React/Vue/Svelte SPA → npx create-vite@latest my-app -- --template react-ts (or vue-ts, svelte-ts)

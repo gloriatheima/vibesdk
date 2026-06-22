@@ -129,10 +129,10 @@ export class UniversalAgentSession extends DurableObject<Env> {
 
 		const FILE_TOOLS = ['file_write', 'file_read', 'file_list', 'direct_response'];
 		const REMOTE_TOOLS = [
-			'browse', 'browser_navigate', 'browser_screenshot',
+			'browse', 'browser_navigate', 'browser_screenshot', 'browser_scrape',
 			'http_fetch',
 			'email_send', 'email_inbox', 'email_read',
-			'call_worker', 'call_service',
+			'call_worker', 'call_service', 'worker_deploy',
 			'shell_exec', 'sandbox_run', 'sandbox_write', 'sandbox_read',
 			'artifact_create', 'artifact_get_token', 'artifact_list', 'artifact_delete',
 		];
