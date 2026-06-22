@@ -17,11 +17,15 @@ export function createApp(env: Env): Hono<AppEnv> {
     // Observability: Sentry error reporting & context
     // initHonoSentry(app);
 
-    // Apply global security middlewares (skip for WebSocket upgrades)
+    // Apply global security middlewares (skip for WebSocket upgrades and preview routes)
     app.use('*', async (c, next) => {
         // Skip secure headers for WebSocket upgrade requests
         const upgradeHeader = c.req.header('upgrade');
         if (upgradeHeader?.toLowerCase() === 'websocket') {
+            return next();
+        }
+        // Skip restrictive security headers for session preview routes (served in iframe)
+        if (c.req.path.includes('/preview/')) {
             return next();
         }
         // Apply secure headers
