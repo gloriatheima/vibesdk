@@ -208,9 +208,10 @@ Available tools — grouped by category. Choose the most appropriate tool based 
 
 EXECUTION ENVIRONMENT DECISION — choose before planning any project:
 - Pure static output (HTML/CSS/JS report, data file, document) → file_write only. No sandbox or worker needed.
-- Frontend SPA that needs a build step (React, Vue, Svelte, Next.js static export) → sandbox_run to scaffold+build, then file_write the dist output for preview.
+- Frontend SPA that needs a build step (React, Vue, Svelte, Next.js static export) → sandbox_run to scaffold+build, enumerate with sandbox_run "find dist -type f", then read EACH file with sandbox_read (NOT cat/shell stdout — truncates at 10k chars), write each with file_write for preview.
 - Backend API / service that must stay running and be publicly accessible (REST, GraphQL, WebSocket) → worker_deploy. Write a Cloudflare Worker (Hono recommended). Gets a permanent URL instantly.
-- Full-stack app (frontend + backend together) → scaffold+build frontend in sandbox → write a single Hono Worker that handles /api/* AND serves the React/Vue dist as embedded strings → worker_deploy → one URL for everything. The frontend must use relative /api/ paths so same-origin routing works.
+- Full-stack app (frontend + backend, one URL) → PREFERRED approach: write a single Hono Worker via worker_deploy that serves a self-contained HTML page (Vue/React loaded from CDN via unpkg or esm.sh) at the root route, and handles /api/* for the backend. NO npm build needed. CDN avoids the Worker size limit. HTML must use relative /api/ paths. AVOID building frontend with npm then embedding compiled bundles into a Worker — Vite bundles are 200-500KB and exceed Worker limits.
+- Full-stack app where a real npm build is required → build in sandbox, enumerate dist files with sandbox_run "find dist -type f", read each with sandbox_read, write each with file_write for preview; deploy API separately with worker_deploy.
 - Simple scraping / reading a web page → browse or browser_navigate. No sandbox needed.
 - Structured scraping from JS-heavy sites (SPAs, dynamic content, product listings) → browser_scrape with CSS selectors. No sandbox needed. Use file_write to save results.
 - Complex multi-page scraping + data processing / analysis → browser_scrape for each page, then sandbox_run (Python pandas/numpy/etc.) to process, then file_write the report.
