@@ -7,7 +7,7 @@ export class ToolExecutor {
 	) {}
 
 	private r2Key(filename: string): string {
-		return `sessions/${this.sessionId}/${filename}`;
+		return `sessions/${this.sessionId}/${filename.replace(/^\/+/, '')}`;
 	}
 
 	async runLocal(action: ActionEventData): Promise<string> {
