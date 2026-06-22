@@ -1,7 +1,7 @@
 import { getSandbox } from '@cloudflare/sandbox';
 import type { Sandbox as SandboxDO } from '@cloudflare/sandbox';
 import type { ToolServerEnv } from './env';
-import { handleMcpRequest, handlePoolRelease } from './router';
+import { handleMcpRequest, handlePoolRelease, handleSandboxWarmup } from './router';
 import type { SandboxPool as SandboxPoolType } from './pool';
 
 export { Sandbox } from '@cloudflare/sandbox';
@@ -25,6 +25,9 @@ export default {
 		}
 
 		const url = new URL(request.url);
+		if (url.pathname === '/sandbox/warmup') {
+			return handleSandboxWarmup(request, env);
+		}
 		if (url.pathname === '/pool/release') {
 			return handlePoolRelease(request, env);
 		}

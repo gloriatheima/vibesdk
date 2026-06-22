@@ -114,6 +114,21 @@ async function acquirePoolSlot(env: ToolServerEnv, sessionId: string): Promise<s
 	}
 }
 
+export async function warmupSandbox(env: ToolServerEnv, sessionId: string): Promise<void> {
+	if (!env.Sandbox) return;
+	try {
+		const sandboxId = await acquirePoolSlot(env, sessionId);
+		const isPoolSlot = sandboxId.startsWith('sandbox-pool-');
+		const ns = isPoolSlot
+			? (env.PersistentSandbox as unknown as DurableObjectNamespace<SandboxDO>)
+			: env.Sandbox;
+		const sandbox = getSandbox(ns, sandboxId);
+		await sandbox.exec('echo warmup', { timeout: 30 });
+	} catch {
+		// non-fatal — warmup failure is silent; the real call will handle it
+	}
+}
+
 export async function executeTool(
 	name: string,
 	args: Record<string, unknown>,
@@ -189,7 +204,7 @@ async function runWrite(args: Record<string, unknown>, sandbox: SandboxInstance)
 
 	const dir = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';
 	if (dir) {
-		await sandbox.exec(`mkdir -p "${dir}"`, { timeout: 10 });
+		await sandbox.exec(`mkdir -p "${dir}"`, { timeout: 30 });
 	}
 
 	await sandbox.writeFile(path, content);

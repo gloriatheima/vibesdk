@@ -220,10 +220,19 @@ const worker = {
 		await handleInboundEmail(message, env);
 	},
 
-	async queue(batch: MessageBatch, env: Env): Promise<void> {
+	async queue(batch: MessageBatch, env: Env, ctx: ExecutionContext): Promise<void> {
 		for (const msg of batch.messages) {
 			const payload = msg.body as AgentTaskPayload;
 			try {
+				ctx.waitUntil(
+					env.TOOL_SERVER.fetch(
+						new Request('https://tool-server.internal/sandbox/warmup', {
+							method: 'POST',
+							headers: { 'content-type': 'application/json' },
+							body: JSON.stringify({ sessionId: payload.sessionId }),
+						}),
+					).catch(() => {}),
+				);
 				const doId = env.UniversalAgentSession.idFromName(payload.sessionId);
 				const stub = env.UniversalAgentSession.get(doId) as DurableObjectStub<UniversalAgentSession>;
 				await stub.processTask(payload);

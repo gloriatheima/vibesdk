@@ -1,6 +1,7 @@
 import type { McpRequest, McpResponse, McpToolsCallParams, McpTool } from '../worker/agents/universal/mcp/types';
 import type { ToolServerEnv } from './env';
 import type { SandboxPool } from './pool';
+import { warmupSandbox } from './tools/sandbox';
 import * as browser from './tools/browser';
 import * as email from './tools/email';
 import * as http from './tools/http';
@@ -38,6 +39,19 @@ function ok(id: number, result: unknown): McpResponse {
 
 function err(id: number, code: number, message: string): McpResponse {
 	return { jsonrpc: '2.0', id, error: { code, message } };
+}
+
+export async function handleSandboxWarmup(request: Request, env: ToolServerEnv): Promise<Response> {
+	let sessionId: string;
+	try {
+		const body = (await request.json()) as { sessionId?: string };
+		sessionId = body.sessionId ?? '';
+	} catch {
+		return new Response('Bad Request', { status: 400 });
+	}
+	if (!sessionId) return new Response('Bad Request', { status: 400 });
+	await warmupSandbox(env, sessionId);
+	return new Response('OK', { status: 200 });
 }
 
 export async function handlePoolRelease(request: Request, env: ToolServerEnv): Promise<Response> {
