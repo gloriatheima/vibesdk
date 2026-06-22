@@ -176,7 +176,8 @@ Available tools — grouped by category. Choose the most appropriate tool based 
 - browse(url) — navigate to a URL and return the page as clean Markdown. PREFERRED for reading articles, docs, or any static web page. Fast, no JS execution.
 - browser_navigate(url, format?) — like browse but with format control: 'content' (default) returns raw HTML; 'markdown' returns Markdown. Use when browse output is insufficient.
 - browser_screenshot(url, width?, height?) — take a screenshot of a URL, returns base64 PNG. Use when visual output or layout inspection is needed.
-- browser_scrape(url, selectors, wait_for?) — fully render the page (JavaScript executed) then extract structured data via CSS selectors. Use for: JavaScript-heavy SPAs, e-commerce product listings, dynamic tables, paginated data, any site that requires JS to show content. Returns matched elements with text and attributes. Chain with sandbox_run for data analysis/processing.
+- browser_scrape(url, selectors, wait_for?) — fully render the page (JavaScript executed) then extract structured data via CSS selectors. Returns matched elements with text and attributes.
+- browser_content(url, wait_for?) — fully render the page and return the raw HTML string. Use when you need flexible parsing (e.g. Python + BeautifulSoup in sandbox_run) or when CSS selectors are uncertain. Returns up to 50 KB of HTML.
 - http_fetch(url, method?, body?) — make a raw HTTP request and return the full response. Use when you need POST/PUT/DELETE or need the raw response headers/status.
 
 [EMAIL]
@@ -214,9 +215,7 @@ EXECUTION ENVIRONMENT DECISION — choose before planning any project:
 - Backend API / service that must stay running and be publicly accessible (REST, GraphQL, WebSocket) → worker_deploy. Write a Cloudflare Worker (Hono recommended). Gets a permanent URL instantly.
 - Full-stack app (frontend + backend, one URL) → PREFERRED approach: write a single Hono Worker via worker_deploy that serves a self-contained HTML page (Vue/React loaded from CDN via unpkg or esm.sh) at the root route, and handles /api/* for the backend. NO npm build needed. CDN avoids the Worker size limit. HTML must use relative /api/ paths. AVOID building frontend with npm then embedding compiled bundles into a Worker — Vite bundles are 200-500KB and exceed Worker limits.
 - Full-stack app where a real npm build is required → build in sandbox, enumerate dist files with sandbox_run "find dist -type f", read each with sandbox_read, write each with file_write for preview; deploy API separately with worker_deploy.
-- Simple scraping / reading a web page → browse or browser_navigate. No sandbox needed.
-- Structured scraping from JS-heavy sites (SPAs, dynamic content, product listings) → browser_scrape with CSS selectors. No sandbox needed. Use file_write to save results.
-- Complex multi-page scraping + data processing / analysis → browser_scrape for each page, then sandbox_run (Python pandas/numpy/etc.) to process, then file_write the report.
+- Web reading / scraping: browse (returns Markdown, good for reading articles), browser_content (returns raw rendered HTML, good for custom parsing with Python), browser_scrape (extracts specific fields via CSS selectors, good when the DOM structure is known). Choose based on what the task needs — there is no single correct tool.
 - Pure computation / data processing / testing (no web) → sandbox_run, return result via direct_response or file_write.
 - Long-running Python/Node server (Flask, FastAPI, Express) → convert to a Cloudflare Worker equivalent (Hono for Node, or use Python Workers if needed) and worker_deploy. Do NOT try to keep sandbox processes alive — they terminate after the step.
 

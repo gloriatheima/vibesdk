@@ -63,9 +63,25 @@ export const TOOL_DEFINITIONS: McpTool[] = [
 					description: 'CSS selectors to extract. Each entry is a selector string, e.g. "h1", ".price", "table.results td".',
 					items: { type: 'string' },
 				},
-				wait_for: { type: 'string', description: 'Optional CSS selector to wait for before extracting (useful for lazy-loaded content)' },
+					wait_for: { type: 'string', description: 'Optional CSS selector to wait for before extracting (useful for lazy-loaded content)' },
 			},
 			required: ['url', 'selectors'],
+		},
+	},
+	{
+		name: 'browser_content',
+		description:
+			'Fetch the fully JavaScript-rendered HTML of a page via Cloudflare Browser Rendering REST API. ' +
+			'Returns raw HTML string (up to 50 KB). ' +
+			'Strength: flexible — the caller can parse the HTML any way they like (e.g. sandbox_run Python + BeautifulSoup). ' +
+			'Compare: browse returns Markdown text (good for reading); browser_scrape extracts by CSS selector (good when selectors are known); browser_content returns raw HTML (good when you need custom parsing or selectors are uncertain).',
+		inputSchema: {
+			type: 'object',
+			properties: {
+				url: { type: 'string', description: 'URL to render' },
+				wait_for: { type: 'string', description: 'Optional single CSS selector to wait for before capturing HTML' },
+			},
+			required: ['url'],
 		},
 	},
 ];
@@ -84,9 +100,44 @@ export async function executeTool(
 			return runBrowserScreenshot(args, env);
 		case 'browser_scrape':
 			return runBrowserScrape(args, env);
+		case 'browser_content':
+			return runBrowserContent(args, env);
 		default:
 			throw new Error(`browser: unknown tool ${name}`);
 	}
+}
+
+async function runBrowserContent(args: Record<string, unknown>, env: ToolServerEnv): Promise<string> {
+	const url = str(args.url);
+	if (!url) throw new Error('browser_content requires url');
+
+	const { CLOUDFLARE_ACCOUNT_ID: accountId, CLOUDFLARE_API_TOKEN: apiToken } = env;
+	if (!accountId || !apiToken) {
+		throw new Error('browser_content requires CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN secrets');
+	}
+
+	const body: Record<string, unknown> = { url };
+	if (args.wait_for) {
+		const sel = str(args.wait_for).split(',')[0].trim();
+		if (sel) body.waitForSelector = sel;
+	}
+
+	const resp = await fetch(
+		`https://api.cloudflare.com/client/v4/accounts/${accountId}/browser-rendering/content`,
+		{
+			method: 'POST',
+			headers: { authorization: `Bearer ${apiToken}`, 'content-type': 'application/json' },
+			body: JSON.stringify(body),
+		},
+	);
+
+	const json = (await resp.json()) as BrowserRenderingResult;
+	if (!resp.ok || json.success === false) {
+		const errMsg = json.errors?.map((e) => e.message).filter(Boolean).join('; ');
+		throw new Error(`browser_content ${resp.status}: ${errMsg ?? 'unknown error'}`);
+	}
+
+	return truncate(json.result ?? '', MAX_BROWSER_BYTES);
 }
 
 async function runBrowserNavigate(args: Record<string, unknown>, env: ToolServerEnv): Promise<string> {
