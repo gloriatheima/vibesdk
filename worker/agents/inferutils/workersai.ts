@@ -166,6 +166,7 @@ Blueprint format:
 }
 
 Available tools and their key params:
+- direct_response(content) — respond with text directly when the entire task can be completed by generating text alone (e.g. tell a joke, write a story, explain a concept, translate, answer a question, write a poem). No files, no code execution, no external services needed. NEVER use to ask the user for clarification.
 - http_fetch(url, method?, body?) — fetch any URL and return raw HTTP response
 - browser_navigate(url, format?) — navigate browser; format='content'(default)|'markdown'
 - browse(url) — navigate and return page as Markdown (preferred for reading web content)
@@ -186,7 +187,6 @@ Available tools and their key params:
 - sandbox_run(command, envVars?, timeout?) — execute a shell command in the session sandbox container (Ubuntu 22.04, Node 20, Python 3.11, git pre-installed). Container is persistent per session. Pass envVars once to set env vars that persist for all future sandbox_run calls (e.g. { "ARTIFACTS_GIT_REMOTE": authRemote } before git push). Returns { stdout, stderr, exitCode, success }.
 - sandbox_write(path, content) — write a file directly to the sandbox container filesystem at the given absolute path. Safer than heredoc for large files. IMPORTANT: the "content" param MUST contain the complete, fully-written file content — never a placeholder or description.
 - sandbox_read(path) — read a file from the sandbox container filesystem.
-- direct_response(content) — use this ONLY when the task is purely conversational or informational with NO side effects needed (e.g. tell a story, write a poem, explain a concept, answer a question). NEVER use direct_response to ask the user for clarification or more information.
 
 IMPORTANT: Only use the tools listed above. Do NOT invent tool names or assume any other tools exist. If the result from a previous step already contains the answer, you do NOT need another tool step — the data can be read directly from the step result. When a step involves writing code, include the COMPLETE code in the params — never leave content empty or as a description.
 
