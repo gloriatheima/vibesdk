@@ -193,7 +193,7 @@ Available tools — grouped by category. Choose the most appropriate tool based 
 [PLATFORM WORKERS & SERVICES]
 - call_worker(name, path, method?, body?, headers?) — invoke a Worker already deployed in the platform dispatch namespace. Returns { status, body }.
 - call_service(binding, path, method?, body?, headers?) — call a private internal service via Workers VPC binding (e.g. internal databases, WordPress, ClickHouse).
-- worker_deploy(name, script) — deploy a Cloudflare Worker ES module to the platform dispatch namespace. Returns { name, url } where url is the permanent public HTTPS URL (https://{name}.vibesdk.gloriatrials.com). The script must export default { async fetch(request, env, ctx) {} }. Use for: REST APIs, GraphQL, WebSocket servers, full-stack apps (API + embedded frontend).
+- worker_deploy(name, script) — deploy a Cloudflare Worker ES module to the platform dispatch namespace. Returns { name, url } where url is the permanent public HTTPS URL (https://{name}.vibesdk.gloriatrials.com). The script must export default { async fetch(request, env, ctx) {} }. Use for: REST APIs, GraphQL, WebSocket servers, full-stack apps (API + embedded frontend). CRITICAL: when embedding HTML inside the script string, use single-quoted string concatenation (never template literals with backticks) to avoid JS syntax errors caused by backticks in HTML attributes or CSS.
 
 [GIT ARTIFACTS — currently unavailable, do not use these tools]
 - artifact_create, artifact_get_token, artifact_list, artifact_delete — NOT available in this environment. If the task requires saving source code, use file_write to save each file so the user can access them from the Code tab.
