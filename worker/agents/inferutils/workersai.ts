@@ -315,9 +315,12 @@ One JSON object per line. No markdown, no explanations, no extra text.
 
 CRITICAL RULES:
 - ALWAYS follow the plan exactly. Execute every step as specified.
-- Each action MUST fit on a single line. All strings in params must use JSON escape sequences (\n for newline, \t for tab, \'  — NEVER actual newlines inside a JSON string value).
-- For sandbox_write steps, generate the COMPLETE file content yourself. Use absolute paths starting with /workspace/ (e.g. /workspace/app.py). Never leave content empty.
-- For worker_deploy steps, the script must be a valid Cloudflare Worker ES module. Use only single-quoted strings and \n for line breaks. NEVER use backtick template literals. NEVER use multi-line strings. Minimal valid Hono template: import{Hono}from'https://esm.sh/hono@3';const app=new Hono();app.get('/',(c)=>c.json({ok:true}));export default app;
+- Each action MUST fit on a single line. All strings in params must use JSON escape sequences (\\n for newline, \\t for tab — NEVER actual newlines inside a JSON string value).
+- NEVER use template variables like {{stepN.output}} or {{step2.content}} in params. You cannot reference previous step outputs — all param values must be concrete strings you generate yourself.
+- For sandbox_write steps, generate the COMPLETE file content yourself inline. Use absolute paths starting with /workspace/ (e.g. /workspace/app.py). Never leave content empty or use placeholders.
+- When writing Python, every variable assignment must have a value (e.g. \`articles = []\` not \`articles =\`). Every code block must be syntactically complete.
+- For browser_scrape, selectors must be a JSON array of CSS selector strings: ["h2 a", "h3 a"]. NEVER use an object like {"key": "selector"}.
+- For worker_deploy steps, the script must be a valid Cloudflare Worker ES module. Use only single-quoted strings and \\n for line breaks. NEVER use backtick template literals. NEVER use multi-line strings. Minimal valid Hono template: import{Hono}from'https://esm.sh/hono@3';const app=new Hono();app.get('/',(c)=>c.json({ok:true}));export default app;
 - NEVER use direct_response to ask the user for clarification or more information. If a step is unclear, make your best attempt to execute it.
 - NEVER skip steps or replace code-execution steps with direct_response.`;
 
