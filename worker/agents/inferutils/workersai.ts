@@ -233,7 +233,11 @@ Do NOT hand-write React/Vue boilerplate (main.tsx, vite.config.ts, tsconfig.json
 
 Only use the tools listed above. When a step involves writing code or content, include the COMPLETE content in the params — never leave it empty or as a placeholder.
 
-NEVER plan a direct_response step whose content depends on data fetched by a prior tool step (browse, browser_*, http_fetch, sandbox_run). The Executor cannot know what those tools will return. Use file_write to save fetched data instead.
+NEVER plan a direct_response step whose content depends on data fetched by a prior tool step (browse, browser_*, http_fetch, sandbox_run, call_service, call_worker). The Executor cannot know what those tools will return. Use file_write to save fetched data instead.
+
+For tasks requiring call_service or call_worker followed by file_write: plan ONLY the call_service/call_worker step. The Reflector will carry the response data forward to the next iteration where file_write can be planned with the actual content.
+
+For WordPress VPC calls via call_service, pass headers: '{"Host": "wordpress.gloriatrials.com"}' (or the actual WordPress domain) so WordPress generates correct permalink URLs instead of service.local URLs.
 
 For tasks that only require reading or extracting content from a URL (e.g. get titles, links, summaries), use browse as a SINGLE step with no subsequent steps. The Reflector will read the browse output and extract the answer directly. Do NOT add file_write or sandbox_run after browse just to 'format' results.
 
@@ -406,7 +410,8 @@ Key rules:
 1. If a tool step returned data that directly answers the original instruction, mark isDone=true and include the answer in the summary. Do NOT ask for more steps just to format or re-read data that is already in the results — extract it yourself. IMPORTANT: if browse or browser_content returned markdown or HTML content containing the requested information (e.g. article titles, links, prices), extract that information yourself and mark isDone=true immediately — do not require a separate file_write or sandbox_run step.
 2. If a step's output contains a non-zero exitCode, "command not found", "permission denied", HTTP error codes (4xx/5xx), "Invalid input", or other error signals, that step did NOT fulfill its intended goal — even if the tool call itself technically returned a result. Reason about whether the overall task was still achieved despite the failure.
 3. If the task was not fully accomplished due to step failures, set isDone=false and write a nextInstruction that proposes a different approach or a different tool from the available set that could accomplish the same goal.
-4. CRITICAL — detect fabricated results: If a data-fetching step (browse, browser_*, http_fetch, sandbox_run) FAILED, and a subsequent direct_response presents content that appears to contain the data that step was supposed to fetch (e.g. article titles, URLs, scraped content), that content is fabricated and not real. Set isDone=false and write a nextInstruction to retry using a different tool (e.g. browse or browser_content instead of browser_scrape).
+4. CRITICAL — detect fabricated results: If a data-fetching step (browse, browser_*, http_fetch, sandbox_run, call_service) FAILED, and a subsequent direct_response presents content that appears to contain the data that step was supposed to fetch (e.g. article titles, URLs, scraped content), that content is fabricated and not real. Set isDone=false and write a nextInstruction to retry using a different tool.
+5. CRITICAL — detect placeholder files: If a file_write step wrote content containing placeholder text (e.g. '等待', 'waiting', '更新', 'placeholder', 'TODO', 'Step 2 has been executed with a placeholder'), the file does NOT contain real data. Set isDone=false and write a nextInstruction to call the data-fetching tool again and write the actual formatted content to the file.
 
 Output ONLY valid JSON:
 {
