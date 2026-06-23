@@ -142,6 +142,7 @@ export class UniversalAgentSession extends DurableObject<Env> {
 		mcpClient.registerServiceBinding(REMOTE_TOOLS, this.env.TOOL_SERVER);
 
 		const history: ConversationTurn[] = [];
+		const originalInstruction = payload.instruction;
 		let currentInstruction = payload.instruction;
 		const writtenFiles: string[] = [];
 
@@ -239,7 +240,7 @@ export class UniversalAgentSession extends DurableObject<Env> {
 				}
 
 				if (reflection.nextInstruction) {
-					currentInstruction = reflection.nextInstruction;
+					currentInstruction = `[Original task: ${originalInstruction}]\n\n${reflection.nextInstruction}`;
 				}
 			}
 

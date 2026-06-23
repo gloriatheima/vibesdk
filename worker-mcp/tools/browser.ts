@@ -101,10 +101,9 @@ export const TOOL_DEFINITIONS: McpTool[] = [
 	{
 		name: 'web_scrape',
 		description:
-			'Render a web page with full JavaScript execution and extract structured content in code — no LLM parsing required. ' +
-			'Returns a JSON object with page title, H1 headings, H2 headings, and links. ' +
-			'FIRST CHOICE for any extraction task: "get H1 tag", "extract page title", "find article links", "list headings". ' +
-			'Use extract=["h1"] to get only H1 headings, or omit extract to get title + h1 + h2 + links.',
+			'Render a web page with full JavaScript execution and extract structured content via CSS selectors. ' +
+			'Returns a JSON object with page title, H1 headings, H2 headings, and/or links depending on the extract param. ' +
+			'Use extract=["h1"] for headings only, extract=["links"] for links only, or omit extract to get title + h1 + h2 + links.',
 		inputSchema: {
 			type: 'object',
 			properties: {

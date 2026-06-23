@@ -233,20 +233,6 @@ Do NOT hand-write React/Vue boilerplate (main.tsx, vite.config.ts, tsconfig.json
 
 Only use the tools listed above. When a step involves writing code or content, include the COMPLETE content in the params — never leave it empty or as a placeholder.
 
-NEVER plan a direct_response step whose content depends on data fetched by a prior tool step (browse, browser_*, http_fetch, sandbox_run, call_service, call_worker). The Executor cannot know what those tools will return. Use file_write to save fetched data instead.
-
-For tasks requiring call_service or call_worker followed by file_write: plan ONLY the call_service/call_worker step. The Reflector will carry the response data forward to the next iteration where file_write can be planned with the actual content.
-
-For WordPress VPC calls via call_service, pass headers: '{"Host": "wordpress.gloriatrials.com"}' (or the actual WordPress domain) so WordPress generates correct permalink URLs instead of service.local URLs.
-For WordPress REST API queries that only need titles and links, add \`_fields=id,title,link,date\` to the query string (e.g. /wp-json/wp/v2/posts?per_page=5&_fields=id,title,link,date) to get a compact response without full post content.
-
-For tasks that only require reading or extracting content from a URL (e.g. get titles, links, summaries):
-- For STATIC pages (plain HTML, API endpoints): use browse or http_fetch as a SINGLE step. The Reflector will read the output and extract the answer directly.
-- For DYNAMIC/JS-rendered pages (React/Vue SPAs, blogs like blog.cloudflare.com, news sites): use browser_content(url) instead of browse or http_fetch. browser_content uses a headless Chromium browser that executes JavaScript, so it can see content that browse/http_fetch cannot.
-- Do NOT add file_write or sandbox_run after browse/browser_content just to 'format' results — the Reflector handles that.
-
-CRITICAL — NEVER INVENT DATA: If a data-fetching tool (browse, browser_content, http_fetch, browser_scrape) does not return the specific items requested (article titles, prices, listings), you MUST NOT write a file containing made-up data. Do NOT write placeholder HTML with fake article names or fake URLs. Instead, report failure in a direct_response step and let the Reflector decide the next approach.
-
 Output nothing except the JSON blueprint after the thinking block. No markdown, no explanation.`;
 
 export type PlannerCallbacks = {
@@ -413,15 +399,9 @@ You receive the original instruction, a completed execution plan, and the tool r
 Evaluate whether the overall task is complete or if further steps are needed.
 
 Key rules:
-1. If a tool step returned data that directly answers the original instruction, mark isDone=true. CRITICAL: the summary field MUST contain the actual extracted data — titles, URLs, prices, post content, etc. — not just a statement like "Successfully fetched X". Extract and format the real data from the tool result into the summary. For example if posts were fetched, list each post title and link in the summary. The summary IS the user-facing output shown in the UI.
-   EXCEPTION: If the original instruction explicitly asks for a formatted file output (e.g. '整理成列表', '保存', '写入文件', 'save to file', 'format as list', 'write a report'), do NOT mark isDone=true until a file_write step has successfully written real non-placeholder content. If the data was retrieved but not yet written to a file, set isDone=false and write a nextInstruction that says: "Write a formatted markdown file with the following content: [paste the actual retrieved data here]".
-   IMPORTANT for summary format: use a numbered or bulleted list when presenting multiple items. Include all relevant fields (title, URL, date, etc.) visible in the tool result.
-   When the result is a list of titled links, populate the "items" array with {title, url} pairs copied verbatim from the tool output. The UI renders items as a structured list.
-2. If a step's output contains a non-zero exitCode, "command not found", "permission denied", HTTP error codes (4xx/5xx), "Invalid input", or other error signals, that step did NOT fulfill its intended goal — even if the tool call itself technically returned a result. Reason about whether the overall task was still achieved despite the failure.
-3. If the task was not fully accomplished due to step failures, set isDone=false and write a nextInstruction that proposes a different approach or a different tool from the available set that could accomplish the same goal.
-4. CRITICAL — detect fabricated results: If a data-fetching step (browse, browser_*, http_fetch, sandbox_run, call_service) FAILED or returned no relevant structured data, and a subsequent step (direct_response, sandbox_write, file_write) presents content that appears to contain the data that step was supposed to fetch (e.g. article titles, URLs, scraped content), that content is fabricated and not real. Specific signs of fabrication in written files: sequential URL patterns like /article1, /article2, /article3; placeholder titles like 'Understanding DNS Security', 'HTTP/3 Performance Guide'; titles or URLs that do NOT appear anywhere in any tool output. Set isDone=false and write a nextInstruction to retry using browser_content (headless JS browser) instead of browse or http_fetch.
-5. CRITICAL — detect placeholder files: If a file_write step wrote content containing placeholder text (e.g. '等待', 'waiting', '更新', 'placeholder', 'TODO', 'Step 2 has been executed with a placeholder'), the file does NOT contain real data. Set isDone=false and write a nextInstruction to call the data-fetching tool again and write the actual formatted content to the file.
-6. CRITICAL — carry forward data in nextInstruction: When a multi-step task is only partially complete (e.g. data was extracted but not yet emailed, saved, or processed), nextInstruction MUST embed the actual output from the already-completed successful steps verbatim. Do NOT ask the Planner to re-run a data-fetching step that already succeeded. Example: if H1 was extracted as "OpenCode 完全指南..." and the task also requires emailing it, write nextInstruction as: "H1 extraction is done — the content is: 'OpenCode 完全指南...'. Now use email_send to deliver this exact text to the user's specified address." This ensures the Planner uses the real data in the next step instead of hallucinating a new URL or placeholder value.
+1. If a tool step returned data that directly answers the original instruction, mark isDone=true. The summary field MUST contain the actual extracted data — titles, URLs, content, etc. — not just a statement like "Successfully fetched X". The summary IS the user-facing output shown in the UI. When the result is a list of titled links, populate the "items" array with {title, url} pairs copied verbatim from the tool output.
+2. If a step's output contains a non-zero exitCode, "command not found", "permission denied", HTTP error codes (4xx/5xx), or other error signals, that step did NOT fulfill its intended goal. Reason about whether the overall task was still achieved despite the failure.
+3. If the task was not fully accomplished, set isDone=false and describe in nextInstruction what still needs to be done, including any relevant data already retrieved in successful steps.
 
 Output ONLY valid JSON:
 {
