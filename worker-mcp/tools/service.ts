@@ -70,6 +70,9 @@ export async function executeTool(
 		text = text.replaceAll('service.local', hostHeader);
 	}
 
+	// Normalize JSON-escaped forward slashes so URLs are readable (e.g. \/ → /)
+	text = text.replaceAll('\\/', '/');
+
 	return JSON.stringify({
 		status: resp.status,
 		body: truncate(text),
