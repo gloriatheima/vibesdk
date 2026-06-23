@@ -73,13 +73,28 @@ export const TOOL_DEFINITIONS: McpTool[] = [
 		description:
 			'Fetch the fully JavaScript-rendered HTML of a page via Cloudflare Browser Rendering REST API. ' +
 			'Returns raw HTML string (up to 50 KB). ' +
-			'Strength: flexible — the caller can parse the HTML any way they like (e.g. sandbox_run Python + BeautifulSoup). ' +
-			'Compare: browse returns Markdown text (good for reading); browser_scrape extracts by CSS selector (good when selectors are known); browser_content returns raw HTML (good when you need custom parsing or selectors are uncertain).',
+			'Compare: browse returns Markdown text (good for reading); browser_scrape extracts by CSS selector (good when selectors are known); browser_content returns raw HTML (good when you need to read the full page structure); extract_links extracts all hyperlinks as structured JSON (best for link/title extraction tasks).',
 		inputSchema: {
 			type: 'object',
 			properties: {
 				url: { type: 'string', description: 'URL to render' },
 				wait_for: { type: 'string', description: 'Optional single CSS selector to wait for before capturing HTML' },
+			},
+			required: ['url'],
+		},
+	},
+	{
+		name: 'extract_links',
+		description:
+			'Render a page with full JavaScript execution and extract all hyperlinks as structured JSON. ' +
+			'Returns an array of {text, href} objects with relative URLs resolved to absolute. ' +
+			'Best tool for tasks like "get article titles and links", "list all posts", "find links on a page". ' +
+			'Preferred over browser_content for any link or title extraction task.',
+		inputSchema: {
+			type: 'object',
+			properties: {
+				url: { type: 'string', description: 'URL to extract links from' },
+				wait_for: { type: 'string', description: 'Optional CSS selector to wait for before extracting (e.g. "article", ".post-list")' },
 			},
 			required: ['url'],
 		},
@@ -102,9 +117,64 @@ export async function executeTool(
 			return runBrowserScrape(args, env);
 		case 'browser_content':
 			return runBrowserContent(args, env);
+		case 'extract_links':
+			return runExtractLinks(args, env);
 		default:
 			throw new Error(`browser: unknown tool ${name}`);
 	}
+}
+
+async function runExtractLinks(args: Record<string, unknown>, env: ToolServerEnv): Promise<string> {
+	const url = str(args.url);
+	if (!url) throw new Error('extract_links requires url');
+
+	const { CLOUDFLARE_ACCOUNT_ID: accountId, CLOUDFLARE_API_TOKEN: apiToken } = env;
+	if (!accountId || !apiToken) {
+		throw new Error('extract_links requires CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN secrets');
+	}
+
+	const body: Record<string, unknown> = { url, elements: [{ selector: 'a' }] };
+	if (args.wait_for) {
+		const sel = str(args.wait_for).split(',')[0].trim();
+		if (sel) body.waitForSelector = { selector: sel };
+	}
+
+	const resp = await fetch(
+		`https://api.cloudflare.com/client/v4/accounts/${accountId}/browser-rendering/scrape`,
+		{
+			method: 'POST',
+			headers: { authorization: `Bearer ${apiToken}`, 'content-type': 'application/json' },
+			body: JSON.stringify(body),
+		},
+	);
+
+	const json = (await resp.json()) as ScrapeResult;
+	if (!resp.ok || json.success === false) {
+		const errMsg = json.errors?.map((e) => e.message).filter(Boolean).join('; ');
+		throw new Error(`extract_links ${resp.status}: ${errMsg ?? 'unknown error'}`);
+	}
+
+	const aResults = (json.result ?? []).find((e) => e.selector === 'a')?.results ?? [];
+
+	let baseOrigin = '';
+	try { baseOrigin = new URL(url).origin; } catch { /* ignore */ }
+
+	const seen = new Set<string>();
+	const links: Array<{ text: string; href: string }> = [];
+
+	for (const el of aResults) {
+		const text = el.text.trim();
+		const rawHref = el.attributes['href'] ?? '';
+		if (!text || text.length < 2) continue;
+		if (!rawHref || rawHref.startsWith('#') || rawHref.startsWith('javascript:') || rawHref.startsWith('mailto:')) continue;
+		const href = rawHref.startsWith('/') && baseOrigin ? baseOrigin + rawHref : rawHref.startsWith('http') ? rawHref : null;
+		if (!href || seen.has(href)) continue;
+		seen.add(href);
+		links.push({ text, href });
+		if (links.length >= 100) break;
+	}
+
+	return JSON.stringify(links);
 }
 
 async function runBrowserContent(args: Record<string, unknown>, env: ToolServerEnv): Promise<string> {

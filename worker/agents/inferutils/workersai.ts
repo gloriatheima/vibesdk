@@ -494,11 +494,30 @@ export async function runReflectorBrain(
 	return result;
 }
 
+function extractTopLevelJsonObjects(raw: string): string[] {
+	const candidates: string[] = [];
+	let depth = 0;
+	let start = -1;
+	for (let i = 0; i < raw.length; i++) {
+		if (raw[i] === '{') {
+			if (depth === 0) start = i;
+			depth++;
+		} else if (raw[i] === '}') {
+			depth--;
+			if (depth === 0 && start >= 0) {
+				candidates.push(raw.slice(start, i + 1));
+				start = -1;
+			}
+		}
+	}
+	return candidates;
+}
+
 function parseReflectorResult(raw: string): ReflectorResult {
-	const match = raw.match(/\{[\s\S]*\}/);
-	if (match) {
+	const candidates = extractTopLevelJsonObjects(raw).reverse();
+	for (const candidate of candidates) {
 		try {
-			const parsed = JSON.parse(match[0]) as Partial<ReflectorResult>;
+			const parsed = JSON.parse(candidate) as Partial<ReflectorResult>;
 			if (typeof parsed.isDone === 'boolean' && typeof parsed.summary === 'string') {
 				const items = Array.isArray(parsed.items)
 					? parsed.items.filter(
@@ -517,8 +536,9 @@ function parseReflectorResult(raw: string): ReflectorResult {
 				};
 			}
 		} catch {
-			logger.warn('Failed to parse reflector JSON, defaulting to done');
+			continue;
 		}
 	}
+	logger.warn('Failed to parse reflector JSON, defaulting to done', { raw: raw.slice(0, 300) });
 	return { isDone: true, summary: 'Task execution complete (reflector parse fallback)' };
 }
