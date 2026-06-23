@@ -88,13 +88,33 @@ export const TOOL_DEFINITIONS: McpTool[] = [
 		description:
 			'Render a page with full JavaScript execution and extract all hyperlinks as structured JSON. ' +
 			'Returns an array of {text, href} objects with relative URLs resolved to absolute. ' +
-			'Best tool for tasks like "get article titles and links", "list all posts", "find links on a page". ' +
-			'Preferred over browser_content for any link or title extraction task.',
+			'For richer extraction (H1, title, headings + links together), use web_scrape instead.',
 		inputSchema: {
 			type: 'object',
 			properties: {
 				url: { type: 'string', description: 'URL to extract links from' },
 				wait_for: { type: 'string', description: 'Optional CSS selector to wait for before extracting (e.g. "article", ".post-list")' },
+			},
+			required: ['url'],
+		},
+	},
+	{
+		name: 'web_scrape',
+		description:
+			'Render a web page with full JavaScript execution and extract structured content in code — no LLM parsing required. ' +
+			'Returns a JSON object with page title, H1 headings, H2 headings, and links. ' +
+			'FIRST CHOICE for any extraction task: "get H1 tag", "extract page title", "find article links", "list headings". ' +
+			'Use extract=["h1"] to get only H1 headings, or omit extract to get title + h1 + h2 + links.',
+		inputSchema: {
+			type: 'object',
+			properties: {
+				url: { type: 'string', description: 'URL to scrape' },
+				extract: {
+					type: 'array',
+					description: 'Elements to extract. Options: "title", "h1", "h2", "h3", "links". Omit to get all.',
+					items: { type: 'string' },
+				},
+				wait_for: { type: 'string', description: 'Optional CSS selector to wait for before extracting' },
 			},
 			required: ['url'],
 		},
@@ -119,6 +139,8 @@ export async function executeTool(
 			return runBrowserContent(args, env);
 		case 'extract_links':
 			return runExtractLinks(args, env);
+		case 'web_scrape':
+			return runWebScrape(args, env);
 		default:
 			throw new Error(`browser: unknown tool ${name}`);
 	}
@@ -164,7 +186,7 @@ async function runExtractLinks(args: Record<string, unknown>, env: ToolServerEnv
 
 	for (const el of aResults) {
 		const text = el.text.trim();
-		const rawHref = el.attributes['href'] ?? '';
+		const rawHref = getScrapeAttr(el.attributes, 'href');
 		if (!text || text.length < 2) continue;
 		if (!rawHref || rawHref.startsWith('#') || rawHref.startsWith('javascript:') || rawHref.startsWith('mailto:')) continue;
 		const href = rawHref.startsWith('/') && baseOrigin ? baseOrigin + rawHref : rawHref.startsWith('http') ? rawHref : null;
@@ -175,6 +197,95 @@ async function runExtractLinks(args: Record<string, unknown>, env: ToolServerEnv
 	}
 
 	return JSON.stringify(links);
+}
+
+function getScrapeAttr(attrs: ScrapeAttribute[], name: string): string {
+	return attrs.find((a) => a.name === name)?.value ?? '';
+}
+
+async function runWebScrape(args: Record<string, unknown>, env: ToolServerEnv): Promise<string> {
+	const url = str(args.url);
+	if (!url) throw new Error('web_scrape requires url');
+
+	const { CLOUDFLARE_ACCOUNT_ID: accountId, CLOUDFLARE_API_TOKEN: apiToken } = env;
+	if (!accountId || !apiToken) {
+		throw new Error('web_scrape requires CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN secrets');
+	}
+
+	const toExtract =
+		Array.isArray(args.extract) && args.extract.length > 0
+			? args.extract.map(String)
+			: ['title', 'h1', 'h2', 'links'];
+	const want = new Set(toExtract);
+
+	const selectors: string[] = [];
+	if (want.has('title')) selectors.push('title');
+	if (want.has('h1')) selectors.push('h1');
+	if (want.has('h2')) selectors.push('h2');
+	if (want.has('h3')) selectors.push('h3');
+	if (want.has('links')) selectors.push('a');
+
+	const body: Record<string, unknown> = { url, elements: selectors.map((s) => ({ selector: s })) };
+	if (args.wait_for) {
+		const sel = str(args.wait_for).trim();
+		if (sel) body.waitForSelector = { selector: sel };
+	}
+
+	const resp = await fetch(
+		`https://api.cloudflare.com/client/v4/accounts/${accountId}/browser-rendering/scrape`,
+		{
+			method: 'POST',
+			headers: { authorization: `Bearer ${apiToken}`, 'content-type': 'application/json' },
+			body: JSON.stringify(body),
+		},
+	);
+
+	const json = (await resp.json()) as ScrapeResult;
+	if (!resp.ok || json.success === false) {
+		const errMsg = json.errors?.map((e) => e.message).filter(Boolean).join('; ');
+		throw new Error(`web_scrape ${resp.status}: ${errMsg ?? 'unknown error'}`);
+	}
+
+	const elements = json.result ?? [];
+	const result: Record<string, unknown> = { url };
+
+	if (want.has('title')) {
+		const rows = elements.find((e) => e.selector === 'title')?.results ?? [];
+		result.title = rows[0]?.text?.trim() ?? null;
+	}
+
+	for (const tag of ['h1', 'h2', 'h3'] as const) {
+		if (want.has(tag)) {
+			const rows = elements.find((e) => e.selector === tag)?.results ?? [];
+			result[tag] = rows.map((r) => r.text.trim()).filter(Boolean);
+		}
+	}
+
+	if (want.has('links')) {
+		const aRows = elements.find((e) => e.selector === 'a')?.results ?? [];
+		let baseOrigin2 = '';
+		try { baseOrigin2 = new URL(url).origin; } catch { /* ignore */ }
+
+		const seen2 = new Set<string>();
+		const linkList: Array<{ text: string; href: string }> = [];
+
+		for (const el of aRows) {
+			const text = el.text.trim();
+			const rawHref = getScrapeAttr(el.attributes, 'href');
+			if (!text || text.length < 2) continue;
+			if (!rawHref || rawHref.startsWith('#') || rawHref.startsWith('javascript:') || rawHref.startsWith('mailto:')) continue;
+			const href = rawHref.startsWith('/') && baseOrigin2
+				? baseOrigin2 + rawHref
+				: rawHref.startsWith('http') ? rawHref : null;
+			if (!href || seen2.has(href)) continue;
+			seen2.add(href);
+			linkList.push({ text, href });
+			if (linkList.length >= 100) break;
+		}
+		result.links = linkList;
+	}
+
+	return truncate(JSON.stringify(result));
 }
 
 async function runBrowserContent(args: Record<string, unknown>, env: ToolServerEnv): Promise<string> {
@@ -240,9 +351,20 @@ async function runBrowserNavigate(args: Record<string, unknown>, env: ToolServer
 	return truncate(json.result ?? '', MAX_BROWSER_BYTES);
 }
 
+interface ScrapeAttribute {
+	name: string;
+	value: string;
+}
+
+interface ScrapeElementResult {
+	text: string;
+	html?: string;
+	attributes: ScrapeAttribute[];
+}
+
 interface ScrapeElement {
 	selector: string;
-	results: Array<{ text: string; attributes: Record<string, string> }>;
+	results: ScrapeElementResult[];
 }
 
 interface ScrapeResult {
