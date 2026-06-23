@@ -16,7 +16,6 @@ import type {
 	ErrorEventData,
 	ToolResultEventData,
 	ReflectEventData,
-	ReflectItem,
 	FileEventData,
 	DeployReadyEventData,
 	ConversationTurn,
@@ -221,18 +220,6 @@ export class UniversalAgentSession extends DurableObject<Env> {
 						await this.emit({ type: 'thinking', data: { content: chunk } });
 					},
 				});
-
-				// Code-level fabrication check: verify item URLs appear in actual tool outputs.
-				if (reflection.isDone && reflection.items && reflection.items.length > 0) {
-					const allOutputs = history.flatMap(h => h.results.map(r => r.output ?? '')).join('\n');
-					const fabricated = reflection.items.filter((item: ReflectItem) => item.url && !allOutputs.includes(item.url));
-					if (fabricated.length > 0) {
-						logger.warn('Fabricated item URLs detected', { fabricated });
-						reflection.isDone = false;
-						reflection.items = undefined;
-						reflection.nextInstruction = 'Some URLs in the result were not found in tool outputs and may be fabricated. Re-fetch using browser_content and provide verified titles and links.';
-					}
-				}
 
 				await this.emit({
 					type: 'reflect',
