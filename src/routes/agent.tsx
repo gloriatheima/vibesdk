@@ -577,12 +577,12 @@ export default function AgentPage() {
 									<ol className="space-y-3">
 										{doneReflect.items.map((item: ReflectItem, i: number) => (
 											<li key={i} className="flex flex-col gap-0.5">
-												<span className="text-sm text-text-primary font-medium">{item.title}</span>
+												<span className="text-sm text-white font-medium">{item.title}</span>
 												<a
 													href={item.url}
 													target="_blank"
 													rel="noopener noreferrer"
-													className="text-xs text-blue-400 hover:text-blue-300 break-all"
+													className="text-xs text-green-400 hover:text-green-300 break-all"
 												>
 													{item.url}
 												</a>
@@ -590,7 +590,7 @@ export default function AgentPage() {
 										))}
 									</ol>
 								) : (
-									<p className="text-sm text-text-primary/90 leading-relaxed whitespace-pre-wrap break-words">
+									<p className="text-sm text-white/90 leading-relaxed whitespace-pre-wrap break-words">
 										{doneReflect.summary}
 									</p>
 								)}
