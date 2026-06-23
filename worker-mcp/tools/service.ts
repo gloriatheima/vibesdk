@@ -70,11 +70,16 @@ export async function executeTool(
 		text = text.replaceAll('service.local', hostHeader);
 	}
 
-	// Normalize JSON-escaped forward slashes so URLs are readable (e.g. \/ → /)
-	text = text.replaceAll('\\/', '/');
+	// If body is valid JSON, embed it directly to avoid double-encoding.
+	// This lets the LLM read all fields (unicode titles, URLs) without escaping.
+	let parsedBody: unknown;
+	try {
+		parsedBody = JSON.parse(text);
+	} catch {
+		// Not JSON — normalize escaped slashes and embed as string
+		text = text.replaceAll('\\/', '/');
+		parsedBody = truncate(text);
+	}
 
-	return JSON.stringify({
-		status: resp.status,
-		body: truncate(text),
-	});
+	return truncate(JSON.stringify({ status: resp.status, body: parsedBody }));
 }
