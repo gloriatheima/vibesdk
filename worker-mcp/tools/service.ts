@@ -12,7 +12,7 @@ export const TOOL_DEFINITIONS: McpTool[] = [
 		inputSchema: {
 			type: 'object',
 			properties: {
-				binding: { type: 'string', description: 'Name of the vpc_services binding (e.g. INTERNAL_API)' },
+				binding: { type: 'string', description: 'Name of the vpc_services binding. MUST be UPPERCASE (e.g. WORDPRESS, INTERNAL_API).' },
 				path: { type: 'string', description: 'Request path, e.g. /v1/data' },
 				method: { type: 'string', enum: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD'], description: 'HTTP method (default GET)' },
 				body: { type: 'string', description: 'Request body (for POST/PUT/PATCH)' },

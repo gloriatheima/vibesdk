@@ -6,8 +6,7 @@ export const TOOL_DEFINITIONS: McpTool[] = [
 		name: 'get_design_system',
 		description:
 			'Return the Cloudflare brand design system tokens — colors, gradients, typography, CSS variables, Tailwind config, and component patterns. ' +
-			'Call this tool FIRST before generating any website, web page, landing page, or frontend UI to ensure Cloudflare visual style consistency. ' +
-			'Use the returned tokens throughout generated HTML/CSS/React code.',
+			'Use when generating websites, web pages, or any frontend UI to apply Cloudflare visual style.',
 		inputSchema: {
 			type: 'object',
 			properties: {

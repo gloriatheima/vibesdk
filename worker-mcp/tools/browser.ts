@@ -51,8 +51,6 @@ export const TOOL_DEFINITIONS: McpTool[] = [
 		name: 'browser_scrape',
 		description:
 			'Extract structured data from a URL using CSS selectors. Renders the full page with JavaScript before extracting. ' +
-			'Use for scraping JavaScript-heavy sites, SPAs, or when you need specific fields from a page. ' +
-			'For simple article reading use browse instead. ' +
 			'Returns an array of matched elements per selector with their text and attributes.',
 		inputSchema: {
 			type: 'object',
@@ -71,9 +69,8 @@ export const TOOL_DEFINITIONS: McpTool[] = [
 	{
 		name: 'browser_content',
 		description:
-			'Fetch the fully JavaScript-rendered HTML of a page via Cloudflare Browser Rendering REST API. ' +
-			'Returns raw HTML string (up to 50 KB). ' +
-			'Compare: browse returns Markdown text (good for reading); browser_scrape extracts by CSS selector (good when selectors are known); browser_content returns raw HTML (good when you need to read the full page structure); extract_links extracts all hyperlinks as structured JSON (best for link/title extraction tasks).',
+			'Fetch the fully JavaScript-rendered HTML of a page (up to 50 KB). Returns raw HTML string. ' +
+			'Use when you need the complete page markup for further parsing (e.g. BeautifulSoup in sandbox_run).',
 		inputSchema: {
 			type: 'object',
 			properties: {

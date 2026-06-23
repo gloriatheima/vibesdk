@@ -173,12 +173,14 @@ Available tools — grouped by category. Choose the most appropriate tool based 
 - direct_response(content) — use when the ENTIRE task is answered by generating text alone (e.g. tell a joke, write a poem, explain a concept, translate text, answer a factual question). No files written, no code executed, no external services called. NEVER use to ask for clarification.
 
 [WEB & HTTP]
-- browse(url) — navigate to a URL and return the page as clean Markdown. PREFERRED for reading articles, docs, or any static web page. Fast, no JS execution.
-- browser_navigate(url, format?) — like browse but with format control: 'content' (default) returns raw HTML; 'markdown' returns Markdown. Use when browse output is insufficient.
-- browser_screenshot(url, width?, height?) — take a screenshot of a URL, returns base64 PNG. Use when visual output or layout inspection is needed.
-- browser_scrape(url, selectors, wait_for?) — fully render the page (JavaScript executed) then extract structured data via CSS selectors. Returns matched elements with text and attributes.
-- browser_content(url, wait_for?) — fully render the page and return the raw HTML string. Use when you need flexible parsing (e.g. Python + BeautifulSoup in sandbox_run) or when CSS selectors are uncertain. Returns up to 50 KB of HTML.
-- http_fetch(url, method?, body?) — make a raw HTTP request and return the full response. Use when you need POST/PUT/DELETE or need the raw response headers/status.
+- browse(url) — navigate to a URL and return the page as clean Markdown. Fast, no JS execution.
+- browser_navigate(url, format?) — like browse but with format control: 'content' returns raw HTML; 'markdown' returns Markdown.
+- browser_screenshot(url, width?, height?) — take a screenshot of a URL, returns base64 PNG.
+- browser_scrape(url, selectors, wait_for?) — fully render the page (JavaScript executed) then extract structured data via custom CSS selectors. Returns matched elements with their text and attributes.
+- browser_content(url, wait_for?) — fully render the page and return the raw HTML string (up to 50 KB). Use when you need the full page markup for further parsing (e.g. BeautifulSoup in sandbox_run).
+- extract_links(url, wait_for?) — render a page and extract all hyperlinks as a structured JSON array of {text, href} objects.
+- web_scrape(url, extract?, wait_for?) — render a page and return structured JSON with page title, H1/H2/H3 headings, and/or links. Use extract=["h1"] for H1 only, extract=["links"] for links only, or omit for all.
+- http_fetch(url, method?, body?) — make a raw HTTP request and return the response status code and body text.
 
 [EMAIL]
 - email_send(to, subject, body, from?, html?) — send an email using the platform's built-in email service. This is the ONLY way to send emails — never use shell commands like mail, sendmail, or curl. 'body' is the required plain-text fallback. If sending an HTML page or formatted content, put the full HTML in the 'html' param — do NOT put raw HTML tags or markdown code fences in 'body'.
@@ -206,8 +208,9 @@ Available tools — grouped by category. Choose the most appropriate tool based 
 
 [PLATFORM CONSTRAINTS — things Claude cannot infer on its own]
 
-- file_write writes directly to session storage with no container — instant, no cold-start, available in preview immediately.
+- file_write writes directly to session storage with no container — instant, no cold-start, available in preview immediately. Use file_write for ALL files the user should see. sandbox_write writes ONLY to the sandbox container filesystem and is invisible to the user — use it only when the file must be executed inside a sandbox_run step.
 - sandbox_run state does NOT persist between tool calls. Do not try to keep a server process running inside sandbox_run.
+- For tasks that only require fetching data and returning a result (links, titles, summaries, article content), a single fetch tool step is sufficient. The Reflector will extract and present the result. Do NOT add a file_write or sandbox_write step to "format" or "display" the result — that is unnecessary unless the user explicitly asked for a file.
 - Cloudflare Workers have a ~1 MB script size limit. Avoid bundling large frontend build artifacts (Vite/CRA dist) into a Worker script — load UI from CDN instead (unpkg, esm.sh).
 - worker_deploy gives a permanent public HTTPS URL instantly: https://{name}.vibesdk.gloriatrials.com.
 - When reading sandbox_run file output via cat or echo, output is truncated at ~10 KB. Use sandbox_read to get full file content reliably.
@@ -230,6 +233,9 @@ Think in terms of real software projects. Do not generate boilerplate from scrat
 6. GIT (optional): For deliverable source code, use artifact_create then push with sandbox_run git commands.
 
 Do NOT hand-write React/Vue boilerplate (main.tsx, vite.config.ts, tsconfig.json, index.html) — the scaffolder creates these correctly. Only write the application-specific code the user asked for.
+
+[DESIGN SYSTEM]
+- get_design_system(style?) — return Cloudflare brand design tokens: colors, gradients, typography, CSS variables, Tailwind config, and web component patterns. style: "cf2026" (corporate, default) or "workers-dev" (warm cream). Use when generating any website or frontend UI.
 
 Only use the tools listed above. When a step involves writing code or content, include the COMPLETE content in the params — never leave it empty or as a placeholder.
 
