@@ -416,7 +416,7 @@ Key rules:
 1. If a tool step returned data that directly answers the original instruction, mark isDone=true. CRITICAL: the summary field MUST contain the actual extracted data — titles, URLs, prices, post content, etc. — not just a statement like "Successfully fetched X". Extract and format the real data from the tool result into the summary. For example if posts were fetched, list each post title and link in the summary. The summary IS the user-facing output shown in the UI.
    EXCEPTION: If the original instruction explicitly asks for a formatted file output (e.g. '整理成列表', '保存', '写入文件', 'save to file', 'format as list', 'write a report'), do NOT mark isDone=true until a file_write step has successfully written real non-placeholder content. If the data was retrieved but not yet written to a file, set isDone=false and write a nextInstruction that says: "Write a formatted markdown file with the following content: [paste the actual retrieved data here]".
    IMPORTANT for summary format: use a numbered or bulleted list when presenting multiple items. Include all relevant fields (title, URL, date, etc.) visible in the tool result.
-   CRITICAL for URL accuracy: every URL included in the summary MUST be copied verbatim from the tool output — do NOT construct, shorten, or infer URLs. For scraped pages, copy anchor hrefs exactly as they appear in the tool result.
+   When the result is a list of titled links, populate the "items" array with {title, url} pairs copied verbatim from the tool output. The UI renders items as a structured list.
 2. If a step's output contains a non-zero exitCode, "command not found", "permission denied", HTTP error codes (4xx/5xx), "Invalid input", or other error signals, that step did NOT fulfill its intended goal — even if the tool call itself technically returned a result. Reason about whether the overall task was still achieved despite the failure.
 3. If the task was not fully accomplished due to step failures, set isDone=false and write a nextInstruction that proposes a different approach or a different tool from the available set that could accomplish the same goal.
 4. CRITICAL — detect fabricated results: If a data-fetching step (browse, browser_*, http_fetch, sandbox_run, call_service) FAILED or returned no relevant structured data, and a subsequent step (direct_response, sandbox_write, file_write) presents content that appears to contain the data that step was supposed to fetch (e.g. article titles, URLs, scraped content), that content is fabricated and not real. Specific signs of fabrication in written files: sequential URL patterns like /article1, /article2, /article3; placeholder titles like 'Understanding DNS Security', 'HTTP/3 Performance Guide'; titles or URLs that do NOT appear anywhere in any tool output. Set isDone=false and write a nextInstruction to retry using browser_content (headless JS browser) instead of browse or http_fetch.
@@ -425,9 +425,12 @@ Key rules:
 Output ONLY valid JSON:
 {
   "isDone": true | false,
-  "summary": "Summary of what was accomplished, including key data from results if relevant",
-  "nextInstruction": "Only include this key if isDone is false — a rephrased instruction for the next iteration"
+  "summary": "Brief summary of what was accomplished",
+  "items": [{"title": "...", "url": "..."}],
+  "nextInstruction": "Only include this key if isDone is false"
 }
+
+The "items" field is optional. Populate it ONLY when the task result is a list of titled links (articles, posts, search results, etc.) — copy title and url verbatim from the tool output. Omit "items" for tasks that produce code, files, or non-link content. Omit "nextInstruction" when isDone is true.
 
 No markdown. No explanation. Only the JSON object.`;
 
@@ -435,9 +438,15 @@ export type ReflectorCallbacks = {
 	onThinking: (chunk: string) => Promise<void>;
 };
 
+export interface ReflectorItem {
+	title: string;
+	url: string;
+}
+
 export interface ReflectorResult {
 	isDone: boolean;
 	summary: string;
+	items?: ReflectorItem[];
 	nextInstruction?: string;
 }
 
@@ -491,9 +500,19 @@ function parseReflectorResult(raw: string): ReflectorResult {
 		try {
 			const parsed = JSON.parse(match[0]) as Partial<ReflectorResult>;
 			if (typeof parsed.isDone === 'boolean' && typeof parsed.summary === 'string') {
+				const items = Array.isArray(parsed.items)
+					? parsed.items.filter(
+							(it): it is ReflectorItem =>
+								typeof it === 'object' &&
+								it !== null &&
+								typeof (it as ReflectorItem).title === 'string' &&
+								typeof (it as ReflectorItem).url === 'string',
+						)
+					: undefined;
 				return {
 					isDone: parsed.isDone,
 					summary: parsed.summary,
+					items: items && items.length > 0 ? items : undefined,
 					nextInstruction: parsed.nextInstruction,
 				};
 			}

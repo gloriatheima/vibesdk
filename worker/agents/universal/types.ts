@@ -66,10 +66,16 @@ export interface ToolResultEventData {
 	error?: string;
 }
 
+export interface ReflectItem {
+	title: string;
+	url: string;
+}
+
 export interface ReflectEventData {
 	isDone: boolean;
 	summary: string;
 	iteration: number;
+	items?: ReflectItem[];
 }
 
 export interface FileEventData {

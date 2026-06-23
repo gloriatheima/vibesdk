@@ -22,6 +22,7 @@ import type {
 	ActionEventData,
 	ToolResultEventData,
 	ReflectEventData,
+	ReflectItem,
 	DoneEventData,
 	ErrorEventData,
 	StatusEventData,
@@ -571,8 +572,28 @@ export default function AgentPage() {
 								/>
 							) : sandboxEntries.length === 0 && doneReflect ? (
 						<div className="flex-1 overflow-y-auto p-6">
-							<div className="max-w-2xl mx-auto text-sm text-text-primary/90 leading-relaxed whitespace-pre-wrap break-words">
-								{doneReflect.summary}
+							<div className="max-w-2xl mx-auto">
+								{doneReflect.items && doneReflect.items.length > 0 ? (
+									<ol className="space-y-3">
+										{doneReflect.items.map((item: ReflectItem, i: number) => (
+											<li key={i} className="flex flex-col gap-0.5">
+												<span className="text-sm text-text-primary font-medium">{item.title}</span>
+												<a
+													href={item.url}
+													target="_blank"
+													rel="noopener noreferrer"
+													className="text-xs text-blue-400 hover:text-blue-300 break-all"
+												>
+													{item.url}
+												</a>
+											</li>
+										))}
+									</ol>
+								) : (
+									<p className="text-sm text-text-primary/90 leading-relaxed whitespace-pre-wrap break-words">
+										{doneReflect.summary}
+									</p>
+								)}
 							</div>
 						</div>
 					) : sandboxEntries.length === 0 ? (

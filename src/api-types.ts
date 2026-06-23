@@ -223,6 +223,7 @@ export type {
 	ErrorEventData,
 	ToolResultEventData,
 	ReflectEventData,
+	ReflectItem,
 	FileEventData,
 	DeployReadyEventData,
 	TaskStep,
