@@ -135,6 +135,7 @@ export class UniversalAgentSession extends DurableObject<Env> {
 			'call_worker', 'call_service', 'worker_deploy',
 			'shell_exec', 'sandbox_run', 'sandbox_write', 'sandbox_read',
 			'artifact_create', 'artifact_get_token', 'artifact_list', 'artifact_delete',
+			'get_design_system',
 		];
 
 		mcpClient.registerLocal(FILE_TOOLS, (action) => fileExecutor.runLocal(action));

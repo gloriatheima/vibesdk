@@ -9,6 +9,7 @@ import * as dispatch from './tools/dispatch';
 import * as service from './tools/service';
 import * as artifacts from './tools/artifacts';
 import * as sandbox from './tools/sandbox';
+import * as design from './tools/design';
 
 const ALL_TOOL_DEFINITIONS: McpTool[] = [
 	...browser.TOOL_DEFINITIONS,
@@ -18,6 +19,7 @@ const ALL_TOOL_DEFINITIONS: McpTool[] = [
 	...service.TOOL_DEFINITIONS,
 	...artifacts.TOOL_DEFINITIONS,
 	...sandbox.TOOL_DEFINITIONS,
+	...design.TOOL_DEFINITIONS,
 ];
 
 type ToolModule = {
@@ -32,6 +34,7 @@ for (const def of dispatch.TOOL_DEFINITIONS) TOOL_MODULE_MAP[def.name] = dispatc
 for (const def of service.TOOL_DEFINITIONS) TOOL_MODULE_MAP[def.name] = service;
 for (const def of artifacts.TOOL_DEFINITIONS) TOOL_MODULE_MAP[def.name] = artifacts;
 for (const def of sandbox.TOOL_DEFINITIONS) TOOL_MODULE_MAP[def.name] = sandbox;
+for (const def of design.TOOL_DEFINITIONS) TOOL_MODULE_MAP[def.name] = design;
 
 function ok(id: number, result: unknown): McpResponse {
 	return { jsonrpc: '2.0', id, result: result as McpResponse['result'] };
