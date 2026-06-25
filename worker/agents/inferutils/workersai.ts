@@ -6,7 +6,6 @@ const logger = createLogger('WorkersAI');
 export const PLANNER_MODEL = '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b';
 export const EXECUTOR_MODEL = '@cf/qwen/qwen2.5-coder-32b-instruct';
 export const CLAUDE_MODEL = 'claude-sonnet-4-6';
-export const CLAUDE_HAIKU_MODEL = 'claude-haiku-4-5';
 
 type ChatMessage = {
 	role: 'system' | 'user' | 'assistant';
@@ -195,7 +194,7 @@ Available tools — grouped by category. Choose the most appropriate tool based 
 [PLATFORM WORKERS & SERVICES]
 - call_worker(name, path, method?, body?, headers?) — invoke a Worker already deployed in the platform dispatch namespace. Returns { status, body }.
 - call_service(binding, path, method?, body?, headers?) — call a private internal service via Workers VPC binding (e.g. internal databases, WordPress, ClickHouse). Binding names are ALWAYS UPPERCASE (e.g. use "WORDPRESS" not "wordpress"). For WordPress REST API use paths like /wp-json/wp/v2/posts?per_page=5. NOTE: the WordPress \`link\` field returns service.local URLs — always request the \`guid\` field instead (e.g. _fields=id,title,guid,date) to get the correct public URL from guid.rendered.
-- worker_deploy(name, script) — deploy a Cloudflare Worker ES module to the platform dispatch namespace. Returns { name, url } where url is the permanent public HTTPS URL (https://{name}.vibesdk.gloriatrials.com). The script must export default { async fetch(request, env, ctx) {} }. Use for: REST APIs, GraphQL, WebSocket servers, full-stack apps (API + embedded frontend). CRITICAL for embedded HTML: build the HTML using a function that returns a plain string — split long HTML across multiple short single-quoted string segments joined with + so each segment can be visually checked for unescaped quotes. Never use template literals (backticks) inside the Worker script string. Any single quote inside the HTML (e.g. in CSS content or JS strings) must be escaped as \'. If the user may later need the source code (e.g. to download or email it), also write each source file with file_write BEFORE deploying so the files exist in session storage.
+- worker_deploy(name, script) — deploy a Cloudflare Worker ES module to the platform dispatch namespace. Returns { name, url } where url is the permanent public HTTPS URL (https://{name}.vibesdk.gloriatrials.com). The script must export default { async fetch(request, env, ctx) {} }. Use for: REST APIs, GraphQL, WebSocket servers, full-stack apps (API + embedded frontend). CRITICAL for embedded HTML: build the HTML using a function that returns a plain string — split long HTML across multiple short single-quoted string segments joined with + so each segment can be visually checked for unescaped quotes. Never use template literals (backticks) inside the Worker script string. Any single quote inside the HTML (e.g. in CSS content or JS strings) must be escaped as \\'. If the user may later need the source code (e.g. to download or email it), also write each source file with file_write BEFORE deploying so the files exist in session storage.
 
 [GIT ARTIFACTS — currently unavailable, do not use these tools]
 - artifact_create, artifact_get_token, artifact_list, artifact_delete — NOT available in this environment. If the task requires saving source code, use file_write to save each file so the user can access them from the Code tab.
