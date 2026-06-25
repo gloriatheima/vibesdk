@@ -12,30 +12,11 @@ type ChatMessage = {
 	content: string;
 };
 
-type WorkersAiChunk = {
-	response?: string;
-};
-
 type AnthropicChunk = {
 	type: string;
 	delta?: { type: string; text?: string };
 };
 
-// Calls Workers AI with stream:true and returns the raw ReadableStream.
-// Cast is required because the typed overloads don't narrow on stream:true.
-async function runWorkersAiStream(
-	ai: Ai,
-	model: string,
-	messages: ChatMessage[],
-	maxTokens = 8096,
-): Promise<ReadableStream<Uint8Array>> {
-	const run = ai.run.bind(ai) as (
-		model: string,
-		input: Record<string, unknown>,
-	) => Promise<ReadableStream<Uint8Array>>;
-
-	return run(model, { messages, stream: true, max_tokens: maxTokens });
-}
 
 // Parses Anthropic SSE stream (content_block_delta events) into plain text tokens.
 async function* parseAnthropicSse(
@@ -114,45 +95,6 @@ async function runClaudeStream(
 	}
 
 	return resp.body;
-}
-
-// Parses the SSE-formatted chunks emitted by Workers AI streaming into plain text tokens.
-async function* parseWorkersAiSse(
-	stream: ReadableStream<Uint8Array>,
-): AsyncGenerator<string, void, undefined> {
-	const reader = stream.getReader();
-	const decoder = new TextDecoder();
-	let lineBuffer = '';
-
-	try {
-		while (true) {
-			const { done, value } = await reader.read();
-			if (done) break;
-
-			lineBuffer += decoder.decode(value, { stream: true });
-			const lines = lineBuffer.split('\n');
-			lineBuffer = lines.pop() ?? '';
-
-			for (const line of lines) {
-				if (!line.startsWith('data: ')) continue;
-				const payload = line.slice(6).trim();
-				if (payload === '[DONE]') return;
-
-				let chunk: WorkersAiChunk;
-				try {
-					chunk = JSON.parse(payload) as WorkersAiChunk;
-				} catch {
-					continue;
-				}
-
-				if (chunk.response) {
-					yield chunk.response;
-				}
-			}
-		}
-	} finally {
-		reader.releaseLock();
-	}
 }
 
 const PLANNER_SYSTEM_PROMPT = `You are a task planner for an autonomous AI agent platform.
@@ -404,26 +346,14 @@ export async function runExecutorBrain(
 
 const REFLECTOR_SYSTEM_PROMPT = `You are a task completion evaluator for an autonomous AI agent.
 You receive the original instruction, a completed execution plan, and the tool results from running each step.
-Evaluate whether the overall task is complete or if further steps are needed.
-
-Key rules:
-1. If a tool step returned data that directly answers the original instruction, mark isDone=true. The summary field MUST contain the actual extracted data — titles, URLs, content, etc. — not just a statement like "Successfully fetched X". The summary IS the user-facing output shown in the UI. When the result is a list of titled links, populate the "items" array with {title, url} pairs copied verbatim from the tool output.
-2. If a step's output contains a non-zero exitCode, "command not found", "permission denied", HTTP error codes (4xx/5xx), or other error signals, that step did NOT fulfill its intended goal. Reason about whether the overall task was still achieved despite the failure.
-3. If the task was not fully accomplished, set isDone=false and describe in nextInstruction what still needs to be done, including any relevant data already retrieved in successful steps.
-4. If any result or summary contains placeholder domains (example.com, your-domain.com, placeholder.com) or suspiciously generic IDs (/posts/123, /items/1), the executor likely hallucinated the result without calling the tool — set isDone=false and instruct the executor to actually call the tool and use the real response. If the task required email_get_address but the summary shows an email address without a recorded tool result for that step, set isDone=false and instruct to call email_get_address as a tool action.
-5. If the plan included a specific tool step (e.g. call_service, worker_deploy, email_send) but no result was recorded for that tool, set isDone=false.
-6. NEVER state that a tool is "unavailable", "not configured", "not in the tool set", or "cannot be used" in nextInstruction. All tools listed in the system prompt ARE available. If a tool call failed or returned an error, describe the specific error and instruct the executor to retry the same tool call with corrected parameters — do not conclude the tool itself is absent.
-
-Output ONLY valid JSON:
+Evaluate whether the overall task is complete or if further steps are needed, then output ONLY valid JSON:
 {
   "isDone": true | false,
-  "summary": "Brief summary of what was accomplished",
+  "summary": "User-facing summary — include actual extracted data (titles, URLs, values, content), not just metadata statements like 'fetched X'",
   "items": [{"title": "...", "url": "..."}],
-  "nextInstruction": "Only include this key if isDone is false"
+  "nextInstruction": "Only include if isDone is false — describe exactly what still needs to be done"
 }
-
-The "items" field is optional. Populate it ONLY when the task result is a list of titled links (articles, posts, search results, etc.) — copy title and url verbatim from the tool output. Omit "items" for tasks that produce code, files, or non-link content. Omit "nextInstruction" when isDone is true.
-
+The "items" field is optional; populate only when the result is a list of titled links. Omit "nextInstruction" when isDone is true.
 No markdown. No explanation. Only the JSON object.`;
 
 export type ReflectorCallbacks = {
@@ -448,7 +378,7 @@ export async function runReflectorBrain(
 	history: ConversationTurn[],
 	callbacks: ReflectorCallbacks,
 ): Promise<ReflectorResult> {
-	logger.info('Reflector brain starting', { model: PLANNER_MODEL, turns: history.length });
+	logger.info('Reflector brain starting', { model: CLAUDE_MODEL, turns: history.length });
 
 	await callbacks.onThinking('Reflecting on results...\n');
 
@@ -470,15 +400,25 @@ export async function runReflectorBrain(
 		{ role: 'user', content: `Original instruction: ${instruction}\n\n${historyText}` },
 	];
 
-	const stream = await runWorkersAiStream(env.AI, PLANNER_MODEL, messages, 2048);
+	const stream = await runClaudeStream(env, REFLECTOR_SYSTEM_PROMPT, messages[1].content, 4096, CLAUDE_MODEL);
 
 	let fullResponse = '';
-	for await (const token of parseWorkersAiSse(stream)) {
-		fullResponse += token;
+	for await (const chunk of stream) {
+		const text = new TextDecoder().decode(chunk);
+		const lines = text.split('\n');
+		for (const line of lines) {
+			if (line.startsWith('data: ')) {
+				try {
+					const data = JSON.parse(line.slice(6)) as { type?: string; delta?: { type?: string; text?: string } };
+					if (data.type === 'content_block_delta' && data.delta?.type === 'text_delta') {
+						fullResponse += data.delta.text ?? '';
+					}
+				} catch { /* ignore parse errors */ }
+			}
+		}
 	}
 
-	// deepseek-r1 emits <think>...</think> before the JSON — strip it.
-	const stripped = fullResponse.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+	const stripped = fullResponse.trim();
 	const result = parseReflectorResult(stripped);
 	if (result.nextInstruction) {
 		result.nextInstruction = fixVerbatimIdentifiers(result.nextInstruction, instruction);
