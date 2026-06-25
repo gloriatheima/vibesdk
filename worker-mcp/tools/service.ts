@@ -44,7 +44,7 @@ export async function executeTool(
 	if (!bindingName) throw new Error('call_service requires binding');
 
 	const envRecord = env as unknown as Record<string, unknown>;
-	const fetcher = envRecord[bindingName] as { fetch: (req: Request) => Promise<Response> } | undefined;
+	const fetcher = envRecord[bindingName] as { fetch: (input: Request | string, init?: RequestInit) => Promise<Response> } | undefined;
 
 	if (!fetcher || typeof fetcher.fetch !== 'function') {
 		return `error: VPC binding "${bindingName}" is not configured. Add vpc_services entries to wrangler-tool-server.jsonc.`;
@@ -64,13 +64,12 @@ export async function executeTool(
 	}
 
 	const url = new URL(path.startsWith('/') ? path : `/${path}`, 'http://service.local');
-	const req = new Request(url.toString(), {
+	const reqBody = method === 'GET' || method === 'HEAD' ? undefined : body;
+	const resp = await fetcher.fetch(url.toString(), {
 		method,
 		headers: extraHeaders,
-		body: method === 'GET' || method === 'HEAD' ? undefined : body,
-	});
-
-	const resp = await fetcher.fetch(req);
+		body: reqBody,
+	} as RequestInit);
 	let text = await resp.text();
 
 	const hostHeader = extraHeaders['Host'] || extraHeaders['host'];

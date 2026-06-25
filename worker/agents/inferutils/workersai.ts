@@ -403,19 +403,8 @@ export async function runReflectorBrain(
 	const stream = await runClaudeStream(env, REFLECTOR_SYSTEM_PROMPT, messages[1].content, 4096, CLAUDE_MODEL);
 
 	let fullResponse = '';
-	for await (const chunk of stream) {
-		const text = new TextDecoder().decode(chunk);
-		const lines = text.split('\n');
-		for (const line of lines) {
-			if (line.startsWith('data: ')) {
-				try {
-					const data = JSON.parse(line.slice(6)) as { type?: string; delta?: { type?: string; text?: string } };
-					if (data.type === 'content_block_delta' && data.delta?.type === 'text_delta') {
-						fullResponse += data.delta.text ?? '';
-					}
-				} catch { /* ignore parse errors */ }
-			}
-		}
+	for await (const token of parseAnthropicSse(stream)) {
+		fullResponse += token;
 	}
 
 	const stripped = fullResponse.trim();
