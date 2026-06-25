@@ -160,7 +160,7 @@ export async function executeTool(
 
 type SandboxInstance = ReturnType<typeof getSandbox>;
 
-const CONTAINER_ERROR_PATTERNS = ['Unknown Error', 'container not ready', 'provisioning'];
+const CONTAINER_ERROR_PATTERNS = ['Unknown Error', 'container not ready', 'provisioning', 'Command timeout'];
 const RETRY_DELAYS_MS = [8_000, 15_000, 25_000];
 
 function isContainerError(err: unknown): boolean {
