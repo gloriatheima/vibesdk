@@ -168,7 +168,7 @@ async function runEmailInbox(args: Record<string, unknown>, env: ToolServerEnv, 
 	const sinceMs = Number(args.since_ms ?? 0);
 
 	const rows = await env.DB.prepare(
-		`SELECT message_id, from_addr, to_addr, subject, received_at_ms, size_bytes
+		`SELECT message_id, from_addr, to_addr, subject, received_at_ms, size_bytes, body_text
 		 FROM agent_inbox
 		 WHERE received_at_ms >= ?
 		 ORDER BY received_at_ms DESC
@@ -182,6 +182,7 @@ async function runEmailInbox(args: Record<string, unknown>, env: ToolServerEnv, 
 			subject: string;
 			received_at_ms: number;
 			size_bytes: number;
+			body_text: string | null;
 		}>();
 
 	const items = (rows.results ?? []).map((r) => ({
@@ -191,6 +192,7 @@ async function runEmailInbox(args: Record<string, unknown>, env: ToolServerEnv, 
 		subject: r.subject,
 		receivedAt: new Date(r.received_at_ms).toISOString(),
 		sizeBytes: r.size_bytes,
+		body: r.body_text ? r.body_text.slice(0, 800) : null,
 	}));
 
 	if (items.length === 0) return '(empty inbox)';
