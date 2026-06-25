@@ -15,8 +15,8 @@ export const TOOL_DEFINITIONS: McpTool[] = [
 				binding: { type: 'string', description: 'Name of the vpc_services binding. MUST be UPPERCASE (e.g. WORDPRESS, INTERNAL_API).' },
 				path: { type: 'string', description: 'Request path, e.g. /v1/data' },
 				method: { type: 'string', enum: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD'], description: 'HTTP method (default GET)' },
-				body: { type: 'string', description: 'Request body (for POST/PUT/PATCH)' },
-				headers: { type: 'string', description: 'JSON-encoded headers object (optional)' },
+				body: { type: 'string', description: 'Request body string for POST/PUT/PATCH. May also be passed as a JSON object — will be serialized automatically.' },
+				headers: { type: 'string', description: 'Headers as a JSON-encoded string or plain object, e.g. {"Authorization":"Basic xxx","Content-Type":"application/json"}.' },
 			},
 			required: ['binding', 'path'],
 		},
@@ -33,7 +33,13 @@ export async function executeTool(
 	const bindingName = str(args.binding).toUpperCase();
 	const path = str(args.path || '/');
 	const method = str(args.method || 'GET').toUpperCase();
-	const body = args.body !== undefined ? str(args.body) : undefined;
+	const rawBody = args.body;
+	const body =
+		rawBody === undefined
+			? undefined
+			: typeof rawBody === 'string'
+				? rawBody
+				: JSON.stringify(rawBody);
 
 	if (!bindingName) throw new Error('call_service requires binding');
 
@@ -46,10 +52,14 @@ export async function executeTool(
 
 	let extraHeaders: Record<string, string> = {};
 	if (args.headers) {
-		try {
-			extraHeaders = JSON.parse(str(args.headers)) as Record<string, string>;
-		} catch {
-			// ignore malformed headers
+		if (typeof args.headers === 'object' && args.headers !== null) {
+			extraHeaders = args.headers as Record<string, string>;
+		} else {
+			try {
+				extraHeaders = JSON.parse(str(args.headers)) as Record<string, string>;
+			} catch {
+				// ignore malformed headers
+			}
 		}
 	}
 

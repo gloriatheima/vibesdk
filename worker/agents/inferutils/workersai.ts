@@ -183,6 +183,7 @@ Available tools — grouped by category. Choose the most appropriate tool based 
 
 [EMAIL]
 - email_send(to, subject, body, from?, html?) — send an email using the platform's built-in email service. This is the ONLY way to send emails — never use shell commands like mail, sendmail, or curl. 'body' is the required plain-text fallback. If sending an HTML page or formatted content, put the full HTML in the 'html' param — do NOT put raw HTML tags or markdown code fences in 'body'.
+- email_get_address() — get or create this session's unique inbound email address (e.g. agent-abc12345@mail.gloriatrials.com). Call this FIRST when the task involves receiving emails, so external senders know where to write.
 - email_inbox(limit?, since_ms?) — list received emails for this session.
 - email_read(id) — read the full body of an email by message_id.
 
@@ -229,7 +230,7 @@ Think in terms of real software projects. Do not generate boilerplate from scrat
 5. EXPORT to preview: After building, copy dist output to session file storage so the user can see it:
    - Vite/CRA: sandbox_run "find my-app/dist -type f" to enumerate, then file_write each file with its content read via sandbox_read.
    - Python/Node services that must stay running: use direct_response to give the user the run command — they cannot be served as static previews.
-6. GIT (optional): For deliverable source code, use artifact_create then push with sandbox_run git commands.
+6. SOURCE CODE (optional): If the user needs access to the source files, use file_write to save each source file so they appear in the Code tab for viewing and download.
 
 Do NOT hand-write React/Vue boilerplate (main.tsx, vite.config.ts, tsconfig.json, index.html) — the scaffolder creates these correctly. Only write the application-specific code the user asked for.
 

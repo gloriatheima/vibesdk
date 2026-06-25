@@ -40,6 +40,11 @@ export const TOOL_DEFINITIONS: McpTool[] = [
 			required: ['id'],
 		},
 	},
+	{
+		name: 'email_get_address',
+		description: 'Get or create the unique inbound email address for this session. Returns the address to which external senders can send mail that this session can read via email_inbox.',
+		inputSchema: { type: 'object', properties: {} },
+	},
 ];
 
 export async function executeTool(
@@ -55,6 +60,8 @@ export async function executeTool(
 			return runEmailInbox(args, env, sessionId);
 		case 'email_read':
 			return runEmailRead(args, env, sessionId);
+		case 'email_get_address':
+			return runEmailGetAddress(env, sessionId);
 		default:
 			throw new Error(`email: unknown tool ${name}`);
 	}
@@ -129,6 +136,29 @@ async function runEmailSend(args: Record<string, unknown>, env: ToolServerEnv, s
 	};
 	await env.SEND_EMAIL.send(new EmailMessage(message.from, message.to, message.raw));
 	return `sent to ${to} (subject: ${subject.slice(0, 80)})`;
+}
+
+async function runEmailGetAddress(env: ToolServerEnv, sessionId: string): Promise<string> {
+	if (!env.DB) throw new Error('DB binding not configured');
+
+	const domain = env.EMAIL_DOMAIN ?? 'mail.gloriatrials.com';
+
+	const existing = await env.DB
+		.prepare('SELECT alias FROM agent_email_aliases WHERE session_id = ? LIMIT 1')
+		.bind(sessionId)
+		.first<{ alias: string }>();
+
+	if (existing) {
+		return JSON.stringify({ address: `${existing.alias}@${domain}` });
+	}
+
+	const alias = `agent-${sessionId.replace(/[^a-z0-9]/gi, '').slice(0, 8).toLowerCase()}`;
+	await env.DB
+		.prepare('INSERT OR IGNORE INTO agent_email_aliases (alias, session_id, created_at_ms) VALUES (?, ?, ?)')
+		.bind(alias, sessionId, Date.now())
+		.run();
+
+	return JSON.stringify({ address: `${alias}@${domain}` });
 }
 
 async function runEmailInbox(args: Record<string, unknown>, env: ToolServerEnv, sessionId: string): Promise<string> {

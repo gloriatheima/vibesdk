@@ -131,7 +131,7 @@ export class UniversalAgentSession extends DurableObject<Env> {
 		const REMOTE_TOOLS = [
 			'browse', 'browser_navigate', 'browser_screenshot', 'browser_scrape', 'browser_content', 'extract_links', 'web_scrape',
 			'http_fetch',
-			'email_send', 'email_inbox', 'email_read',
+			'email_send', 'email_inbox', 'email_read', 'email_get_address',
 			'call_worker', 'call_service', 'worker_deploy',
 			'shell_exec', 'sandbox_run', 'sandbox_write', 'sandbox_read',
 			'artifact_create', 'artifact_get_token', 'artifact_list', 'artifact_delete',
