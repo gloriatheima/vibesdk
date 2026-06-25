@@ -83,7 +83,7 @@
 	],
 	"vars": {
 		"EMAIL_FROM": "agent@mail.gloriatrials.com",
-		"EMAIL_DOMAIN": "gloriatrials.com",
+		"EMAIL_DOMAIN": "mail.gloriatrials.com",
 		"CUSTOM_DOMAIN": "vibesdk.gloriatrials.com",
 		"DISPATCH_NAMESPACE": "vibesdk-default-namespace"
 	},

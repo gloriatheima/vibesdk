@@ -214,7 +214,7 @@
 		},
 		"CUSTOM_DOMAIN": "vibesdk.gloriatrials.com",
 		"EMAIL_FROM": "agent@mail.gloriatrials.com",
-		"EMAIL_DOMAIN": "gloriatrials.com",
+		"EMAIL_DOMAIN": "mail.gloriatrials.com",
 		"MAX_SANDBOX_INSTANCES": "10",
 		"SANDBOX_INSTANCE_TYPE": "standard-3"
 	},
