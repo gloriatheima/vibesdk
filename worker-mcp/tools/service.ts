@@ -65,11 +65,39 @@ export async function executeTool(
 
 	const url = new URL(path.startsWith('/') ? path : `/${path}`, 'http://service.local');
 	const reqBody = method === 'GET' || method === 'HEAD' ? undefined : body;
-	const resp = await fetcher.fetch(url.toString(), {
+
+	let resp = await fetcher.fetch(url.toString(), {
 		method,
 		headers: extraHeaders,
 		body: reqBody,
+		redirect: 'manual',
 	} as RequestInit);
+
+	// Follow redirects manually to preserve method and body (prevents POST→GET on 301/302)
+	let redirects = 0;
+	while (resp.status >= 301 && resp.status <= 308 && redirects < 5) {
+		const location = resp.headers.get('Location');
+		if (!location) break;
+		const redirectUrl = new URL(location, url.toString());
+		const isInternal = redirectUrl.hostname === 'service.local';
+		if (isInternal) {
+			resp = await fetcher.fetch(redirectUrl.toString(), {
+				method,
+				headers: extraHeaders,
+				body: reqBody,
+				redirect: 'manual',
+			} as RequestInit);
+		} else {
+			resp = await fetch(redirectUrl.toString(), {
+				method,
+				headers: { ...extraHeaders },
+				body: reqBody,
+				redirect: 'manual',
+			});
+		}
+		redirects++;
+	}
+
 	let text = await resp.text();
 
 	const hostHeader = extraHeaders['Host'] || extraHeaders['host'];
