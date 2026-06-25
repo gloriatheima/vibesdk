@@ -161,7 +161,7 @@ async function runEmailGetAddress(env: ToolServerEnv, sessionId: string): Promis
 	return JSON.stringify({ address: `${alias}@${domain}` });
 }
 
-async function runEmailInbox(args: Record<string, unknown>, env: ToolServerEnv, sessionId: string): Promise<string> {
+async function runEmailInbox(args: Record<string, unknown>, env: ToolServerEnv, _sessionId: string): Promise<string> {
 	if (!env.DB) throw new Error('DB binding not configured');
 
 	const limit = Math.min(Number(args.limit ?? 25), 50);
@@ -170,11 +170,11 @@ async function runEmailInbox(args: Record<string, unknown>, env: ToolServerEnv, 
 	const rows = await env.DB.prepare(
 		`SELECT message_id, from_addr, to_addr, subject, received_at_ms, size_bytes
 		 FROM agent_inbox
-		 WHERE session_id = ? AND received_at_ms >= ?
+		 WHERE received_at_ms >= ?
 		 ORDER BY received_at_ms DESC
 		 LIMIT ?`,
 	)
-		.bind(sessionId, sinceMs, limit)
+		.bind(sinceMs, limit)
 		.all<{
 			message_id: string;
 			from_addr: string;
@@ -197,7 +197,7 @@ async function runEmailInbox(args: Record<string, unknown>, env: ToolServerEnv, 
 	return JSON.stringify({ inbox: `agent@${env.EMAIL_DOMAIN ?? 'mail.gloriatrials.com'}`, items });
 }
 
-async function runEmailRead(args: Record<string, unknown>, env: ToolServerEnv, sessionId: string): Promise<string> {
+async function runEmailRead(args: Record<string, unknown>, env: ToolServerEnv, _sessionId: string): Promise<string> {
 	if (!env.DB) throw new Error('DB binding not configured');
 
 	const id = str(args.id);
@@ -206,9 +206,9 @@ async function runEmailRead(args: Record<string, unknown>, env: ToolServerEnv, s
 	const row = await env.DB.prepare(
 		`SELECT message_id, from_addr, to_addr, subject, received_at_ms, size_bytes, body_text
 		 FROM agent_inbox
-		 WHERE session_id = ? AND message_id = ?`,
+		 WHERE message_id = ?`,
 	)
-		.bind(sessionId, id)
+		.bind(id)
 		.first<{
 			message_id: string;
 			from_addr: string;
