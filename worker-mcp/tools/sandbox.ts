@@ -160,12 +160,18 @@ export async function executeTool(
 
 type SandboxInstance = ReturnType<typeof getSandbox>;
 
-const CONTAINER_ERROR_PATTERNS = ['Unknown Error', 'container not ready', 'provisioning', 'Command timeout'];
+const CONTAINER_ERROR_PATTERNS = [
+	'Unknown Error', 'container not ready', 'provisioning',
+	'Command timeout', 'command timed out', 'timed out',
+	'not ready', 'starting', 'initializing', 'unavailable',
+	'Connection refused', 'ECONNREFUSED', 'ETIMEDOUT',
+];
 const RETRY_DELAYS_MS = [8_000, 15_000, 25_000];
 
 function isContainerError(err: unknown): boolean {
 	if (!(err instanceof Error)) return false;
-	return CONTAINER_ERROR_PATTERNS.some(p => err.message.includes(p));
+	const msg = err.message.toLowerCase();
+	return CONTAINER_ERROR_PATTERNS.some(p => msg.includes(p.toLowerCase()));
 }
 
 async function withContainerRetry<T>(fn: () => Promise<T>): Promise<T> {
@@ -175,10 +181,13 @@ async function withContainerRetry<T>(fn: () => Promise<T>): Promise<T> {
 			return await fn();
 		} catch (err) {
 			lastErr = err;
+			const errMsg = err instanceof Error ? err.message : String(err);
 			if (isContainerError(err) && attempt < RETRY_DELAYS_MS.length) {
+				console.warn(`[sandbox] cold-start error (attempt ${attempt + 1}), retrying in ${RETRY_DELAYS_MS[attempt]}ms: ${errMsg}`);
 				await new Promise(r => setTimeout(r, RETRY_DELAYS_MS[attempt]));
 				continue;
 			}
+			console.error(`[sandbox] non-retriable error after ${attempt + 1} attempt(s): ${errMsg}`);
 			throw err;
 		}
 	}
